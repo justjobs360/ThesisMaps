@@ -1,3 +1,4 @@
+'use client';
 import React from 'react';
 import { DataTable } from '@/components/ui/DataTable';
 import { Badge } from '@/components/ui/Badge';
