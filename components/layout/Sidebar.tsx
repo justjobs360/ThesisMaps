@@ -5,7 +5,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import {
   LayoutDashboard, Search, GitFork, AlignLeft,
   Clock, Layers, Lightbulb, Shield, Users, Settings, X,
-  type LucideIcon
+  type LucideIcon,
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useSidebar } from '@/context/SidebarContext';
