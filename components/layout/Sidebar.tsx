@@ -5,6 +5,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import {
   LayoutDashboard, Search, GitFork, AlignLeft,
   Clock, Layers, Lightbulb, Shield, Users, Settings, X,
+  type LucideIcon
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useSidebar } from '@/context/SidebarContext';
@@ -12,7 +13,7 @@ import { useSidebar } from '@/context/SidebarContext';
 type NavItem = {
   href: string;
   label: string;
-  icon: React.ComponentType<{ size?: number; strokeWidth?: number }>;
+  icon: LucideIcon;
 };
 
 const NAV_ITEMS: NavItem[] = [
