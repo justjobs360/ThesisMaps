@@ -5,12 +5,13 @@ import { usePathname } from 'next/navigation';
 import {
   LayoutDashboard, Users, FolderOpen, BookOpen,
   MessageSquare, Flag, BarChart2, Settings, ArrowLeft,
+  type LucideIcon
 } from 'lucide-react';
 
 type NavItem = {
   href: string;
   label: string;
-  icon: React.ComponentType<{ size?: number; strokeWidth?: number }>;
+  icon: LucideIcon;
 };
 
 const ADMIN_NAV: NavItem[] = [
@@ -27,14 +28,14 @@ export function AdminSidebar() {
   const pathname = usePathname();
 
   return (
-    <aside className="fixed top-0 left-0 h-screen w-[220px] bg-admin-bg border-r border-border flex flex-col z-30">
-      <div className="px-4 py-5 border-b border-border flex items-center gap-2">
-        <span className="font-serif text-xl text-text-primary">ThesisMaps</span>
-        <span className="text-xs font-sans font-medium text-accent bg-accent/10 px-1.5 py-0.5 rounded">Admin</span>
+    <aside className="fixed top-0 left-0 h-screen w-[220px] bg-white border-r-2 border-black flex flex-col z-30">
+      <div className="px-6 py-6 border-b-2 border-black flex flex-col gap-1">
+        <span className="font-serif text-2xl font-black text-black tracking-tighter uppercase leading-none">Admin</span>
+        <span className="text-[9px] font-sans font-black text-accent uppercase tracking-[0.2em]">Command Center</span>
       </div>
 
-      <nav className="flex-1 overflow-y-auto py-3" aria-label="Admin navigation">
-        <ul className="space-y-0.5 px-2">
+      <nav className="flex-1 overflow-y-auto py-6" aria-label="Admin navigation">
+        <ul className="space-y-2 px-3">
           {ADMIN_NAV.map(({ href, label, icon: Icon }) => {
             const active = pathname === href || (href !== '/admin' && pathname.startsWith(href));
             return (
@@ -42,14 +43,14 @@ export function AdminSidebar() {
                 <Link
                   href={href}
                   className={[
-                    'flex items-center gap-3 px-3 py-2 rounded text-sm font-sans transition-colors duration-150',
+                    'flex items-center gap-3 px-4 py-3 border-2 transition-all duration-200 uppercase tracking-widest font-black text-[10px]',
                     active
-                      ? 'bg-accent/8 text-text-primary border-l-2 border-accent font-medium'
-                      : 'text-text-muted hover:text-text-primary hover:bg-background border-l-2 border-transparent',
+                      ? 'bg-black text-white border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]'
+                      : 'bg-white text-black border-transparent hover:border-black hover:bg-black hover:text-white',
                   ].join(' ')}
                   aria-current={active ? 'page' : undefined}
                 >
-                  <Icon size={16} strokeWidth={1.5} />
+                  <Icon size={16} strokeWidth={active ? 3 : 2} />
                   {label}
                 </Link>
               </li>
@@ -58,13 +59,13 @@ export function AdminSidebar() {
         </ul>
       </nav>
 
-      <div className="border-t border-border p-3">
+      <div className="border-t-2 border-black p-4">
         <Link
           href="/dashboard"
-          className="flex items-center gap-2 px-3 py-2 rounded text-sm font-sans text-text-muted hover:text-text-primary hover:bg-background transition-colors"
+          className="flex items-center justify-center gap-2 px-4 py-3 border-2 border-black bg-white hover:bg-red-600 hover:text-white transition-all duration-200 text-[10px] font-black uppercase tracking-widest"
         >
-          <ArrowLeft size={14} strokeWidth={1.5} />
-          Exit Admin
+          <ArrowLeft size={14} strokeWidth={3} />
+          Exit Unit
         </Link>
       </div>
     </aside>
