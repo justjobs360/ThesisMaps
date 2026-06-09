@@ -5,6 +5,7 @@ import {
   GitFork, AlignLeft, Lightbulb, Shield, Clock, Search, Users,
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
+import { WordCycler } from '@/components/ui/WordCycler';
 import { MarketingHeader } from '@/components/layout/MarketingHeader';
 import { MarketingFooter } from '@/components/layout/MarketingFooter';
 
@@ -60,22 +61,29 @@ export default function LandingPage() {
 
       <main>
         {/* Hero */}
-        <section className="pt-32 md:pt-40 pb-16 md:pb-24 px-6 max-w-6xl mx-auto text-center" aria-labelledby="hero-heading">
-          <p className="text-[10px] md:text-sm font-sans font-bold uppercase tracking-[0.3em] text-accent mb-6 leading-none">Visual Research Intelligence</p>
-          <h1 id="hero-heading" className="font-serif text-display text-text-primary mb-8 md:mb-12">
-            Map your literature. <br className="hidden md:block" />
-            Find the gaps. <br className="hidden md:block" />
-            Write with confidence.
+        <section className="pt-32 md:pt-48 pb-16 md:pb-24 px-6 max-w-6xl mx-auto text-left relative" aria-labelledby="hero-heading">
+          <div className="absolute top-0 left-0 w-full h-full -z-10 opacity-40 mix-blend-multiply pointer-events-none bg-[radial-gradient(circle_at_top_right,_var(--tw-gradient-stops))] from-accent/5 via-transparent to-transparent"></div>
+          <p className="text-[10px] md:text-sm font-sans font-bold uppercase tracking-[0.3em] text-accent mb-8 leading-none">Visual Research Intelligence</p>
+          <h1 id="hero-heading" className="font-serif text-[clamp(2.5rem,8vw,5.5rem)] text-text-primary mb-8 md:mb-12 leading-[1.1] tracking-tight">
+            The visual way to <br className="hidden md:block" />
+            <WordCycler 
+              words={['Map your literature', 'Find the gaps', 'Write with confidence']} 
+              className="italic font-light text-text-muted"
+            />
           </h1>
-          <p className="max-w-xl mx-auto font-sans text-text-muted text-lg md:text-xl leading-relaxed mb-10 md:mb-12 px-4">
-            ThesisMaps is the research platform built for PhD and masters students who want to move from overwhelming reading lists to a structured, confident thesis — faster.
+          <p className="max-w-2xl font-sans text-text-muted text-lg md:text-2xl leading-relaxed mb-12 md:mb-16">
+            Built exclusively for PhD candidates and researchers. Transform the painful process of literature reviews into an interactive, visual journey.
           </p>
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+          <div className="flex flex-col sm:flex-row items-start gap-6">
             <Link href="/signup" className="w-full sm:w-auto">
-              <Button size="lg" variant="primary" className="w-full sm:w-auto">Start for free</Button>
+              <Button size="lg" variant="primary" pill className="w-full sm:w-auto px-10 h-14 text-base tracking-widest bg-black text-white hover:bg-accent border-none shadow-impact">
+                Start for free
+              </Button>
             </Link>
             <Link href="/login" className="w-full sm:w-auto">
-              <Button size="lg" variant="secondary" className="w-full sm:w-auto">Sign in</Button>
+              <Button size="lg" variant="secondary" pill className="w-full sm:w-auto px-10 h-14 text-base tracking-widest bg-white text-black border-2 border-black hover:bg-black hover:text-white shadow-impact">
+                Sign in
+              </Button>
             </Link>
           </div>
 
