@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { requireUser } from '@/lib/admin-guard';
 import { ensureUser } from '@/lib/repository/users';
 import { getProject } from '@/lib/repository/projects';
-import { listSavedPapers, savePaper, removeSavedPaper } from '@/lib/repository/savedPapers';
+import { listSavedPapers, searchSavedPapers, savePaper, removeSavedPaper } from '@/lib/repository/savedPapers';
 import { handleRouteError } from '@/lib/route-helpers';
 
 const paperSchema = z.object({
@@ -27,17 +27,21 @@ async function assertProjectOwner(projectId: string, userId: string) {
   if (!project) throw new Error('Forbidden: project not found for user');
 }
 
-// GET /api/papers/save?projectId=... — list the project's saved library
+// GET /api/papers/save?projectId=...[&q=...] — list (or search) the project's saved library
 export async function GET(request: Request) {
   try {
     const decoded = await requireUser(request);
     await ensureUser(decoded);
-    const projectId = new URL(request.url).searchParams.get('projectId');
+    const searchParams = new URL(request.url).searchParams;
+    const projectId = searchParams.get('projectId');
+    const q = searchParams.get('q')?.trim();
     const parsed = z.string().uuid().safeParse(projectId);
     if (!parsed.success) return NextResponse.json({ error: 'Invalid projectId' }, { status: 400 });
 
     await assertProjectOwner(parsed.data, decoded.uid);
-    const papers = await listSavedPapers(decoded.uid, parsed.data);
+    const papers = q
+      ? await searchSavedPapers(decoded.uid, parsed.data, q)
+      : await listSavedPapers(decoded.uid, parsed.data);
     return NextResponse.json({ papers });
   } catch (err) {
     return handleRouteError(err, 'papers/save/GET');

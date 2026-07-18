@@ -42,6 +42,27 @@ export async function listSavedPapers(userId: string, projectId: string): Promis
   return (data as SavedRow[]).map(rowToSavedPaper);
 }
 
+/**
+ * Indexed (stemmed, per-word) full-text search over a project's saved library —
+ * matches on `papers.search_vector` (title weighted above abstract), backed by
+ * the GIN index from supabase/migrations/001_papers_search_index.sql.
+ */
+export async function searchSavedPapers(
+  userId: string,
+  projectId: string,
+  query: string
+): Promise<SavedPaper[]> {
+  const { data, error } = await supabaseAdmin
+    .from('saved_papers')
+    .select('*, papers!inner(*)')
+    .eq('user_id', userId)
+    .eq('project_id', projectId)
+    .textSearch('papers.search_vector', query, { type: 'websearch', config: 'english' });
+
+  if (error) throw new Error(`searchSavedPapers failed: ${error.message}`);
+  return (data as SavedRow[]).map(rowToSavedPaper);
+}
+
 export async function savePaper(
   userId: string,
   projectId: string,

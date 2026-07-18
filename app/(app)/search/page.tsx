@@ -8,25 +8,51 @@ import { ResultCard } from '@/components/search/ResultCard';
 import { SkeletonCard } from '@/components/ui/Skeleton';
 import { Badge } from '@/components/ui/Badge';
 import { X } from 'lucide-react';
-import { MOCK_PAPERS } from '@/lib/mockData';
-import type { SearchFilters, Paper } from '@/types/paper';
+import { useProject } from '@/hooks/useProject';
+import { apiClient, ApiError } from '@/lib/apiClient';
+import type { SearchFilters, Paper, SavedPaper } from '@/types/paper';
+
+type SearchScope = 'external' | 'library';
 
 export default function SearchPage() {
+  const { projectId } = useProject();
   const [query, setQuery] = useState('');
   const [submitted, setSubmitted] = useState('');
+  const [scope, setScope] = useState<SearchScope>('external');
   const [filters, setFilters] = useState<SearchFilters>({});
   const [results, setResults] = useState<Paper[]>([]);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   async function handleSearch(q: string) {
     setSubmitted(q);
     setLoading(true);
+    setError(null);
     try {
+      if (scope === 'library') {
+        if (!projectId) {
+          setResults([]);
+          setError('Your project is still loading — try again in a moment.');
+          return;
+        }
+        const { papers } = await apiClient.get<{ papers: SavedPaper[] }>(
+          `/api/papers/save?projectId=${projectId}&q=${encodeURIComponent(q)}`
+        );
+        setResults(papers.map((p) => p.paper));
+        return;
+      }
+
       const res = await fetch(`/api/papers/search?q=${encodeURIComponent(q)}`);
-      const data = (await res.json()) as { papers: Paper[] };
+      const data = (await res.json()) as { papers?: Paper[]; error?: string };
+      if (!res.ok) {
+        setResults([]);
+        setError(data.error ?? `Search failed (${res.status})`);
+        return;
+      }
       setResults(data.papers ?? []);
-    } catch {
-      setResults(MOCK_PAPERS);
+    } catch (err) {
+      setResults([]);
+      setError(err instanceof ApiError ? err.message : 'Could not reach the search service. Check your connection and try again.');
     } finally {
       setLoading(false);
     }
@@ -44,6 +70,29 @@ export default function SearchPage() {
   return (
     <div className="space-y-6 max-w-6xl mx-auto">
       <PageHeader title="Search Papers" subtitle="Search across 8 academic sources simultaneously." />
+
+      <div className="flex gap-0 border-2 border-black w-fit" role="tablist" aria-label="Search scope">
+        <button
+          role="tab"
+          aria-selected={scope === 'external'}
+          onClick={() => setScope('external')}
+          className={`h-9 px-4 font-sans font-black text-[10px] uppercase tracking-widest transition-colors ${
+            scope === 'external' ? 'bg-black text-white' : 'bg-white text-black hover:bg-black/5'
+          }`}
+        >
+          External Sources
+        </button>
+        <button
+          role="tab"
+          aria-selected={scope === 'library'}
+          onClick={() => setScope('library')}
+          className={`h-9 px-4 font-sans font-black text-[10px] uppercase tracking-widest border-l-2 border-black transition-colors ${
+            scope === 'library' ? 'bg-black text-white' : 'bg-white text-black hover:bg-black/5'
+          }`}
+        >
+          My Library
+        </button>
+      </div>
 
       <div className="flex flex-col md:flex-row gap-4">
         <div className="flex-1">
@@ -92,6 +141,11 @@ export default function SearchPage() {
         <div className="flex-1 w-full space-y-4">
           {loading ? (
             Array.from({ length: 5 }).map((_, i) => <SkeletonCard key={i} />)
+          ) : error ? (
+            <div className="text-center py-24 border-2 border-black border-dashed">
+              <p className="text-red-600 font-sans font-bold uppercase tracking-[0.2em] text-[10px]">Search failed</p>
+              <p className="text-black/40 font-sans text-xs mt-2">{error}</p>
+            </div>
           ) : submitted && results.length === 0 ? (
             <div className="text-center py-24 border-2 border-black border-dashed">
               <p className="text-black/40 font-sans font-bold uppercase tracking-[0.2em] text-[10px]">No papers yielded for &quot;{submitted}&quot;</p>
