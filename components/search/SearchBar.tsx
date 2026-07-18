@@ -22,8 +22,8 @@ export function SearchBar({ value, onChange, onSubmit, placeholder = 'Search pap
       <label htmlFor="paper-search" className="sr-only">Search academic papers</label>
       <Search
         size={18}
-        strokeWidth={1.5}
-        className="absolute left-4 top-1/2 -translate-y-1/2 text-text-muted pointer-events-none"
+        strokeWidth={2}
+        className="absolute left-4 top-1/2 -translate-y-1/2 text-black pointer-events-none"
         aria-hidden
       />
       <input
@@ -32,16 +32,16 @@ export function SearchBar({ value, onChange, onSubmit, placeholder = 'Search pap
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        className="w-full h-12 pl-12 pr-12 rounded border border-border bg-surface text-text-primary font-sans text-sm placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-accent focus:border-accent transition-colors"
+        className="w-full h-12 pl-12 pr-12 border-2 border-black bg-white text-black font-sans text-sm placeholder:text-black/40 focus:outline-none focus:border-accent transition-colors"
       />
       {value ? (
         <button
           type="button"
           onClick={() => onChange('')}
           aria-label="Clear search"
-          className="absolute right-4 top-1/2 -translate-y-1/2 p-1 rounded hover:bg-background text-text-muted transition-colors"
+          className="absolute right-3 top-1/2 -translate-y-1/2 p-1 border-2 border-black hover:bg-black hover:text-white text-black transition-colors"
         >
-          <X size={14} strokeWidth={1.5} />
+          <X size={14} strokeWidth={2.5} />
         </button>
       ) : null}
     </form>

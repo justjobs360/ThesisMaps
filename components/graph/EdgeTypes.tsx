@@ -1,7 +1,7 @@
 import React from 'react';
 import { getBezierPath, BaseEdge, type EdgeProps } from 'reactflow';
 
-function makeEdge(strokeDasharray?: string, color = '#4B5563') {
+function makeEdge(color: string, strokeDasharray?: string) {
   return function CustomEdge({
     id, sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, selected,
   }: EdgeProps) {
@@ -14,7 +14,7 @@ function makeEdge(strokeDasharray?: string, color = '#4B5563') {
           stroke: color,
           strokeWidth: 1.5,
           strokeDasharray: strokeDasharray ?? 'none',
-          opacity: selected ? 1 : 0.4,
+          opacity: selected ? 1 : 0.45,
           transition: 'opacity 0.15s',
         }}
       />
@@ -22,9 +22,11 @@ function makeEdge(strokeDasharray?: string, color = '#4B5563') {
   };
 }
 
-export const CitationEdge = makeEdge(undefined, '#6B7280');
-export const SemanticEdge = makeEdge('6 3', '#9CA3AF');
-export const CoAuthorEdge = makeEdge('2 2', '#D1D5DB');
+// Brand palette on the dark canvas: neutral light citation lines, accent-blue
+// semantic-similarity, muted co-author. No pastel/gold.
+export const CitationEdge = makeEdge('#CBD5E1');
+export const SemanticEdge = makeEdge('#0066FF', '6 3');
+export const CoAuthorEdge = makeEdge('#64748B', '2 2');
 
 export const edgeTypes = {
   citation: CitationEdge,

@@ -1,6 +1,5 @@
 'use client';
 
-import type { Metadata } from 'next';
 import { useState } from 'react';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { SearchBar } from '@/components/search/SearchBar';

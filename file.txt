@@ -1,0 +1,692 @@
+Build ThesisMaps — a Visual Research Intelligence Platform for graduate-level thesis research at www.ThesisMaps.com. This is a full-stack Next.js 14+ application (App Router) deployed on Vercel Pro (serverless functions and CDN). Ensure a production-ready implementation with security best practices, strict typing, accessibility, and SEO optimizations.
+
+─────────────────────────────────────────
+ARCHITECTURE & STACK
+─────────────────────────────────────────
+Framework: Next.js 14+ with App Router (no Pages Router) — React 18, TypeScript (strict mode, no any, no JS files).  
+Styling: Tailwind CSS with utility classes and CSS variables; no inline styles.  
+Database: Supabase (PostgreSQL) — use Supabase client directly (no Prisma). Enable pgvector extension.  
+Authentication: Firebase Authentication (email/password + Google OAuth). Use Firebase Admin SDK on server routes and Firebase client SDK in browser. Use Firebase UID (id) as the user identifier across tables. Do not use Supabase Auth (Supabase is pure DB).  
+Caching: Redis via Upstash (24h TTL for metadata, shorter TTL for dynamic data like citation counts) keyed by query hash.  
+Graph Engine: React Flow + D3.js force-directed layout.  
+ML/NLP Microservice: Python FastAPI (hosted on Railway or Vercel Serverless); called asynchronously from Next.js API routes for tasks like semantic search (e.g. SPECTER embeddings), keyword extraction, gap detection, and draft generation.  
+Monitoring: Vercel Analytics for performance metrics and Sentry for error tracking.  
+Hosting: Vercel Pro (Next.js app and API routes).  
+Domain: Primary domain ThesisMaps.com; configure ThesisMaps.co.uk to 301-redirect to .com (DNS-level redirect) to consolidate SEO.  
+Package Manager: pnpm.
+
+─────────────────────────────────────────
+FILE STRUCTURE
+─────────────────────────────────────────
+/
+├── app/
+│   ├── layout.tsx                      # Root layout: fonts, Metadata API (title template, OG, canonical)
+│   ├── page.tsx                        # Landing/marketing page
+│   ├── robots.tsx                      # /robots.txt route handler
+│   ├── sitemap.tsx                     # /sitemap.xml route handler
+│   ├── (auth)/
+│   │   ├── login/page.tsx
+│   │   └── signup/page.tsx
+│   ├── (app)/
+│   │   ├── layout.tsx                  # App shell: sidebar + topbar
+│   │   ├── dashboard/page.tsx
+│   │   ├── graph/page.tsx
+│   │   ├── search/page.tsx
+│   │   ├── outline/page.tsx
+│   │   ├── timeline/page.tsx
+│   │   ├── seeds/page.tsx
+│   │   ├── gaps/page.tsx
+│   │   ├── defence/page.tsx
+│   │   ├── collaborate/page.tsx
+│   │   └── settings/page.tsx
+│   ├── (admin)/
+│   │   ├── layout.tsx                  # Admin shell (separate from app shell)
+│   │   ├── admin/page.tsx
+│   │   ├── admin/users/page.tsx
+│   │   ├── admin/users/[id]/page.tsx
+│   │   ├── admin/projects/page.tsx
+│   │   ├── admin/papers/page.tsx
+│   │   ├── admin/feedback/page.tsx
+│   │   ├── admin/flags/page.tsx
+│   │   └── admin/settings/page.tsx
+│   └── api/
+│       ├── papers/
+│       │   ├── search/route.ts
+│       │   ├── [id]/route.ts
+│       │   └── seed/route.ts
+│       ├── graph/route.ts
+│       ├── outline/route.ts
+│       ├── gaps/route.ts
+│       ├── export/route.ts             # PDF, DOCX, CSV, BibTeX exports
+│       └── admin/
+│           ├── users/route.ts
+│           ├── users/[id]/route.ts
+│           ├── stats/route.ts
+│           ├── papers/route.ts
+│           ├── feedback/route.ts
+│           └── flags/route.ts
+├── components/
+│   ├── ui/                            # Primitive UI components (styled with Tailwind)
+│   │   ├── Button.tsx
+│   │   ├── Badge.tsx
+│   │   ├── Modal.tsx
+│   │   ├── Tooltip.tsx
+│   │   ├── Skeleton.tsx
+│   │   ├── Input.tsx
+│   │   ├── Select.tsx
+│   │   ├── Dropdown.tsx
+│   │   └── DataTable.tsx
+│   ├── graph/                         # Graph-related components
+│   │   ├── KnowledgeGraph.tsx
+│   │   ├── PaperNode.tsx
+│   │   ├── EdgeTypes.tsx
+│   │   └── GraphControls.tsx
+│   ├── search/
+│   │   ├── SearchBar.tsx
+│   │   ├── FilterPanel.tsx
+│   │   └── ResultCard.tsx
+│   ├── outline/
+│   │   ├── OutlineBuilder.tsx
+│   │   ├── ChapterSection.tsx
+│   │   └── CoverageScore.tsx
+│   ├── dashboard/
+│   │   ├── StageTracker.tsx
+│   │   ├── ResearchDebtPanel.tsx
+│   │   └── StatCard.tsx
+│   ├── admin/
+│   │   ├── AdminSidebar.tsx
+│   │   ├── AdminTopbar.tsx
+│   │   ├── StatsCard.tsx
+│   │   ├── UserTable.tsx
+│   │   ├── UserDetailPanel.tsx
+│   │   ├── ProjectTable.tsx
+│   │   ├── PaperTable.tsx
+│   │   ├── FeedbackList.tsx
+│   │   ├── FlagQueue.tsx
+│   │   ├── ActivityFeed.tsx
+│   │   └── AnalyticsCharts.tsx
+│   └── layout/
+│       ├── Sidebar.tsx
+│       ├── Topbar.tsx
+│       └── PageHeader.tsx
+├── lib/
+│   ├── api/                         # External API clients
+│   │   ├── semanticScholar.ts
+│   │   ├── openAlex.ts
+│   │   ├── arxiv.ts
+│   │   ├── crossref.ts
+│   │   ├── pubmed.ts
+│   │   ├── core.ts
+│   │   ├── europePmc.ts
+│   │   └── doaj.ts
+│   ├── normalise.ts                 # Normalize all sources into a unified schema
+│   ├── redis.ts                     # Upstash Redis client
+│   ├── supabase.ts                  # Supabase client (browser)
+│   ├── supabase-server.ts           # Supabase client (server)
+│   ├── firebase.ts                  # Firebase client init
+│   ├── firebase-admin.ts            # Firebase Admin init
+│   ├── admin-guard.ts               # requireAdmin function for API routes
+│   └── mockData.ts                  # Realistic mock data for UI during development
+├── hooks/
+│   ├── useAuth.ts
+│   ├── useGraph.ts
+│   ├── useOutline.ts
+│   ├── useAdminStats.ts
+│   └── useAnalytics.ts
+├── context/
+│   └── AuthContext.tsx             # Provides user info, signIn, signOut, etc.
+├── middleware.ts                    # Protects /app/* and /api/admin/* routes via Firebase ID token (and admin role) 
+├── types/
+│   ├── paper.ts
+│   ├── graph.ts
+│   ├── thesis.ts
+│   └── admin.ts
+├── public/
+│   └── og-image.png
+├── tailwind.config.ts
+├── next.config.ts
+├── vercel.json                      # Vercel configuration (regions, build commands)
+└── .env.example                     # Environment variables template
+───────────────────────────────────────── DESIGN SYSTEM — CRITICAL ───────────────────────────────────────── Reference “anara.com” for feel — refined, editorial, purposeful. No generic SaaS look.
+
+TYPOGRAPHY (use next/font/google):
+
+Display/headings: Instrument Serif (serif).
+Body/UI labels: DM Sans (legible sans-serif).
+Load fonts via next/font with { display: 'swap', preload: true } to optimize rendering
+. Use large serif headings with tight line-height (1.1–1.2) and generous line-height (1.7) for body. No system fonts or Inter/Roboto as primary.
+COLOR TOKENS (define in tailwind.config.ts):
+
+background: #FAF8F4 (warm off-white)
+background-dark: #0F1623 (dark ink/navy)
+surface: #FFFFFF, surface-dark: #1A2233
+accent: #C4973A (muted amber) — use only for primary CTAs, highlights.
+text-primary: #1C1917, text-muted: #78716C
+border: #E7E2D9 (1px subtle border)
+graph-bg: #0D1117 (graph canvas background)
+Status colors: success #2D6A4F, warning #B45309, danger #991B1B.
+No other chromatic colors allowed (e.g. no purple/violet gradients).
+SPACING & SHAPE:
+
+Border radius: 4px on buttons/inputs, 6px on cards. Only avatar circles are fully rounded.
+Box-shadow: 0 1px 3px rgba(0,0,0,0.08) (a single subtle shadow). No heavy shadows.
+Icons: Use Lucide React, size 16px or 18px, stroke width 1.5.
+MOTION (Framer Motion):
+
+Panel slide-ins: 250ms ease-out, translate X/Y.
+Page transitions: subtle fade, 150ms.
+Hover transitions: 150ms.
+No spring/bounce animations, no delayed/staggered loading.
+ABSOLUTE DON’TS:
+
+No purple/violet anywhere.
+No gradient buttons, no glass morphism/backdrop blur.
+No Inter/Roboto or system stacks. No emojis in UI.
+No spinning loaders — use skeleton screens.
+Semantic HTML only (no “div soup”): use <main>, <nav>, <section>, <article>, <aside>, etc. (improves accessibility and SEO
+).
+No fully rounded pill buttons (except one CTA on landing hero).
+No heavy drop shadows beyond 0 1px 3px rgba(0,0,0,0.08).
+───────────────────────────────────────── AUTHENTICATION — FIREBASE ─────────────────────────────────────────
+
+ts
+Copy
+// lib/firebase.ts
+import { initializeApp, getApps } from 'firebase/app';
+import { getAuth } from 'firebase/auth';
+const firebaseConfig = { ...env vars... };
+const app = !getApps().length ? initializeApp(firebaseConfig) : getApps()[0];
+export const auth = getAuth(app);
+
+// lib/firebase-admin.ts
+import { initializeApp, getApps, cert } from 'firebase-admin/app';
+import { getAuth } from 'firebase-admin/auth';
+if (!getApps().length) {
+  initializeApp({ credential: cert({
+    projectId: process.env.FIREBASE_ADMIN_PROJECT_ID,
+    clientEmail: process.env.FIREBASE_ADMIN_CLIENT_EMAIL,
+    privateKey: process.env.FIREBASE_ADMIN_PRIVATE_KEY?.replace(/\\n/g, '\n'),
+  })});
+}
+export const adminAuth = getAuth();
+AuthContext (context/AuthContext.tsx): wrap app in onAuthStateChanged, provide { user, loading, signIn, signUp, signInWithGoogle, signOut }. On login, obtain Firebase ID token to send with server requests.
+Middleware (middleware.ts):
+Protect /app/*: verify Firebase ID token (via Authorization: Bearer <token> header or cookie); redirect unauthenticated to /login.
+Protect /admin/*: verify ID token AND check role = 'admin' in Supabase users table (see lib/admin-guard.ts). Non-admins get redirected to /dashboard.
+Admin Guard (lib/admin-guard.ts):
+ts
+Copy
+export async function requireAdmin(request: Request) {
+  const token = request.headers.get('Authorization')?.replace('Bearer ', '');
+  const decoded = await adminAuth.verifyIdToken(token);
+  const { data: user } = await supabaseAdmin
+    .from('users').select('role').eq('id', decoded.uid).single();
+  if (user?.role !== 'admin') throw new Error('Forbidden');
+  return decoded.uid;
+}
+All /api/admin/* routes must call requireAdmin() before proceeding. This enforces fine-grained API security and least-privilege access
+. Validate and sanitize all inputs using Zod schemas to prevent injection attacks
+.
+
+───────────────────────────────────────── DATABASE — SUPABASE SCHEMA ─────────────────────────────────────────
+
+sql
+Copy
+-- Enable vector extension for embeddings
+create extension if not exists vector;
+
+create table users (
+  id text primary key,
+  email text unique not null,
+  name text,
+  avatar_url text,
+  role text default 'user',
+  status text default 'active',
+  plan text default 'free',
+  admin_notes text,
+  created_at timestamptz default now(),
+  last_active_at timestamptz
+);
+
+create table thesis_projects (
+  id uuid primary key default gen_random_uuid(),
+  user_id text references users(id) on delete cascade,
+  title text not null,
+  field text,
+  current_stage text default 'research_proposal',
+  created_at timestamptz default now()
+);
+
+create table papers (
+  id uuid primary key default gen_random_uuid(),
+  doi text unique,
+  arxiv_id text,
+  title text not null,
+  abstract text,
+  authors jsonb,
+  year int,
+  citation_count int default 0,
+  reference_count int default 0,
+  open_access boolean default false,
+  fields_of_study text[],
+  source text,
+  url text,
+  embedding vector(768),
+  created_at timestamptz default now()
+);
+
+create table saved_papers (
+  id uuid primary key default gen_random_uuid(),
+  user_id text references users(id) on delete cascade,
+  project_id uuid references thesis_projects(id) on delete cascade,
+  paper_id uuid references papers(id) on delete cascade,
+  tags text[],
+  notes text,
+  read_status text default 'unread',
+  is_seed boolean default false,
+  created_at timestamptz default now(),
+  unique(user_id, project_id, paper_id)
+);
+
+create table outline_sections (
+  id uuid primary key default gen_random_uuid(),
+  project_id uuid references thesis_projects(id) on delete cascade,
+  title text not null,
+  order_index int default 0,
+  parent_id uuid references outline_sections(id),
+  created_at timestamptz default now()
+);
+
+create table section_papers (
+  id uuid primary key default gen_random_uuid(),
+  section_id uuid references outline_sections(id) on delete cascade,
+  paper_id uuid references papers(id) on delete cascade,
+  notes text,
+  unique(section_id, paper_id)
+);
+
+create table seed_sets (
+  id uuid primary key default gen_random_uuid(),
+  project_id uuid references thesis_projects(id) on delete cascade,
+  name text not null,
+  paper_ids uuid[],
+  created_at timestamptz default now()
+);
+
+create table collaborations (
+  id uuid primary key default gen_random_uuid(),
+  project_id uuid references thesis_projects(id) on delete cascade,
+  user_id text references users(id) on delete cascade,
+  role text default 'viewer',
+  unique(project_id, user_id)
+);
+
+create table comments (
+  id uuid primary key default gen_random_uuid(),
+  paper_id uuid references papers(id) on delete cascade,
+  user_id text references users(id) on delete cascade,
+  project_id uuid references thesis_projects(id) on delete cascade,
+  content text not null,
+  created_at timestamptz default now()
+);
+
+create table saved_searches (
+  id uuid primary key default gen_random_uuid(),
+  user_id text references users(id) on delete cascade,
+  query text not null,
+  filters jsonb,
+  last_run_at timestamptz default now()
+);
+
+create table feedback (
+  id uuid primary key default gen_random_uuid(),
+  user_id text references users(id) on delete set null,
+  type text not null,
+  subject text not null,
+  message text not null,
+  status text default 'open',
+  admin_notes text,
+  created_at timestamptz default now()
+);
+
+create table flags (
+  id uuid primary key default gen_random_uuid(),
+  flagged_by text references users(id) on delete set null,
+  entity_type text not null,
+  entity_id uuid not null,
+  reason text not null,
+  status text default 'pending',
+  admin_notes text,
+  created_at timestamptz default now()
+);
+
+create table analytics_events (
+  id uuid primary key default gen_random_uuid(),
+  user_id text references users(id) on delete set null,
+  event text not null,
+  properties jsonb,
+  created_at timestamptz default now()
+);
+
+create table admin_activity_log (
+  id uuid primary key default gen_random_uuid(),
+  admin_id text references users(id) on delete set null,
+  action text not null,
+  target_type text,
+  target_id text,
+  notes text,
+  created_at timestamptz default now()
+);
+
+create table platform_settings (
+  key text primary key,
+  value jsonb not null,
+  updated_by text references users(id),
+  updated_at timestamptz default now()
+);
+
+insert into platform_settings (key, value) values
+  ('feature_flags', '{"ml_gap_detection": true, "collaboration": true, "defence_mode": true}'),
+  ('announcement_banner', '{"enabled": false, "message": ""}');
+───────────────────────────────────────── PAGES & COMPONENTS — FULL SPEC ─────────────────────────────────────────
+
+LANDING PAGE (/):
+
+Nav: Logo (Instrument Serif wordmark) + links + “Sign in” / “Get Started” buttons (amber primary CTA).
+Hero: Large serif headline (2–3 lines), subheading (DM Sans). Two CTAs (primary filled amber, secondary outlined). Prominent mockup of graph on dark canvas (use <Image> with appropriate alt, as optimized images improve SEO
+).
+Features: 3–4 sections (alternating text and image). Each with a small label (e.g. “Knowledge Graph”), serif heading, 2–3 sentence body, and UI screenshot (use next/image with lazy loading and alt).
+Thesis Stages: Horizontal list of 7 stage pills (Proposal, Lit Review, Methodology, Data, Analysis, Writing, Defence).
+Differentiators: 3-column grid cards (icon + heading + one-sentence). Examples: “Research Debt Tracker”, “Defence Readiness Mode”, “Methodological Fingerprint”.
+Footer: Logo + links + copyright.
+AUTH PAGES (/login, /signup):
+
+Centered card (max-width 420px) on #FAF8F4 bg. Logo above. Email/password fields (labels above inputs).
+“Continue with Google” (outlined with Google icon SVG).
+Gentle box-shadow, 1px border. No fancy graphics.
+APP SHELL (app/(app)/layout.tsx):
+
+Sidebar (fixed 220px): Logo top, nav links with icon + label. Active item: amber left border + tinted bg. Bottom: user avatar + name + “Settings”.
+Topbar (52px): Breadcrumb (current section). Right side: search trigger icon, notifications icon, user menu.
+Main content: width calc(100vw - 220px), full height, background #FAF8F4, padding 24px. Use semantic containers (<main>, etc).
+DASHBOARD (/dashboard):
+
+Header: Serif heading = project title. Subtitle = current stage.
+Stage Tracker: Horizontal 7-step progress. Current = amber; completed = checkmark. Clickable steps (tooltip or navigate).
+Stats: Row of cards (Serif number, muted label, subtle trend indicator). E.g. “142 Papers Saved”, “3 Outline Chapters”, “2 Research Gaps Found”.
+Research Debt Tracker: Panel listing “should read” papers (title, year, “Review” button) for flagged but unread items. (Supports research debt concept.)
+Suggested Actions: 2–3 cards relevant to current stage (short label + arrow).
+Methodological Fingerprint: Chart showing distribution of methods (quantitative, qualitative, experimental, observational, etc).
+SEARCH (/search):
+
+Search bar: Prominent full-width, border with search icon. Below: active filter chips (removable tags).
+Filter Panel (left, collapsible, 240px): Sections for Recency, Citation Count, Open Access, Field of Study (checkbox multi-select), Thesis Relevance Tags (methodology/theory/etc), Publication Type. Section headers uppercase.
+Results: List of cards. Each card: Title (DM Sans, medium, truncated to 2 lines), Authors (smaller muted), metadata chips (year, citation count, OA badge, source chip with distinct color for Semantic Scholar/OpenAlex/arXiv/CrossRef). “Save to project” button appears on hover (slide-in).
+Empty state: “No papers found. Try broadening your search.” (typographic).
+Loading state: Skeleton cards (no spinners).
+KNOWLEDGE GRAPH (/graph):
+
+Canvas: Full height, #0D1117 bg. Use React Flow + D3 force layout.
+Nodes (180×70px rect): Left border indicates type (amber=seed, blue=citing, green=cited, white=influential, gold ring=bookmarked). Content: title (13px, truncated), year & citation count (muted). On hover: subtle border glow (amber, 1px).
+Edges: 1.5px lines – citation (solid), semantic similarity (dashed), co-author (dotted). Default opacity 0.4, 1.0 on hover.
+Canvas Controls (top-right panel): Zoom in/out, fit view, toggle minimap, heatmap dropdown (color nodes by recency, citation, relevance), export button.
+Minimap: Bottom-right, small overview of nodes.
+Node Detail Panel: On node click, slide in 340px panel from right. Shows full title, authors, truncated abstract (with “read more”), metadata chips, and actions (“Save to project”, “Expand citations”, “Find similar papers”). Click outside or X to close.
+Heatmap Overlay: Dropdown to color nodes by type (default) / recency / citation / relevance.
+Export: Able to export current graph view as PNG, SVG, or PDF.
+OUTLINE BUILDER (/outline):
+
+Left Panel: Outline tree. Each section: drag handle, title, badge with paper count. “+ Add section” button at bottom. Sections nested (via parent_id).
+Main Area: Shows selected section. Editable section title. List of assigned papers (title, year, remove button). Notes textarea. Coverage Score badge (color-coded: green/amber/red) top-right with tooltip explaining (e.g., based on number, recency, citations).
+Drag-and-Drop: Implement using @dnd-kit. Papers from a “paper bank” (right-side saved papers list) are draggable into outline sections.
+Export: Top-right menu: “Export as Word (.docx)” or “Export as PDF”. Each exports outline with citations in the section.
+RESEARCH GAPS (/gaps):
+
+Header: Brief explanation + “Analyze my library” button (runs ML gap analysis).
+Clusters: Grid of cards for topic clusters. Each card: cluster name (keywords), gap score bar (higher = bigger gap), paper count, top keywords as tags. High-gap clusters have amber left border.
+Flagged Papers: List below clusters of papers flagged by phrases like “future work” or “limited studies” (quote snippet, year).
+Loading: Skeleton cluster cards + “Analyzing your library…” label while running.
+LITERATURE TIMELINE (/timeline):
+
+Horizontally scrollable timeline (X-axis = years). Each paper = vertical tick mark (dot). Hover tooltip: title, authors, citation count.
+Seminal papers: pinned larger amber dot with always-visible title.
+Filters above: sub-topic chips, methodology tags.
+Export: “Export as PDF” button (outputs timeline graphic).
+SEED MAPS (/seeds):
+
+Left: List of saved seed sets (name, count, created date). “New seed set” button.
+Main: Selected seed set view: shows seeds list and citation map (reuse graph component in seed mode).
+New Papers: Flag new relevant papers since seed date with amber “New” badge.
+Divergence: If seeds diverge widely, highlight (feature concept).
+COLLABORATION (/collaborate):
+
+Members: List of collaborators (avatar, name, role badge [Editor/Viewer]). “Invite” button opens modal (enter email, role).
+Activity Log: Timeline of actions (“Sarah added 3 papers”, “Dr. Khan commented on a paper”, etc). Timestamped.
+Comments: Comment icon on papers in graph/outlines. Clicking opens thread panel to discuss that paper. In-line comments and replies.
+DEFENCE READINESS (/defence):
+
+Stage Indicator: Highlights “Defence Preparation”.
+Panels (side-by-side): “Counter-Arguments” (papers that challenge core claims), “Contradicting Findings” (papers with opposite results), “Methodology Critiques” (papers critiquing chosen methods). Each lists title, summary, relevance indicator.
+Checklist: Auto-generated defence checklist (checkboxes) from identified issues.
+SETTINGS (/settings):
+
+Sections: Profile (edit name, upload avatar); Thesis Project (edit title, field, stage); Notifications (toggle preferences); Account (change password, delete account).
+Each section has its own “Save” button (no global save).
+───────────────────────────────────────── ADMIN PANEL — FULL SPEC ───────────────────────────────────────── (Routes under /admin/*; requires role='admin'. Non-admins redirected to /dashboard.)
+
+ADMIN LAYOUT (admin/layout.tsx):
+
+Sidebar: Links for Overview, Users, Projects, Papers, Feedback, Flags, Analytics, Settings.
+Topbar: “Admin” label, admin avatar, “Exit Admin” button (go to /dashboard).
+Admin surface color: light #F4F1EC / dark #111827 to distinguish from main app.
+Noindex meta on all /admin pages (prevent crawling).
+Overview (/admin):
+
+Stat Cards: Total users (+30d growth), Active users (7d), Total projects, Total papers saved, Total searches (30d), Open feedback tickets.
+Charts (using Recharts): User signups (line, 90d), DAU (bar, 30d), Top search queries (horizontal bar), Papers saved per day (area), Thesis stage distribution (donut).
+Activity Feed: Right column with latest actions (new user signup, new project, feedback submitted, flags, etc) each with user avatar, name, action, timestamp. Items link to details.
+User Management (/admin/users):
+
+Table: Columns: [Avatar + Name, Email, Signup date, Last active, Plan (badge), Status (Active/Suspended, color), Projects count, Actions (View, Suspend, Ban, Delete, Promote)].
+Features: Search by name/email, filter by status/plan/date, sort by signup/last active/project count. Pagination (50 rows). Bulk actions (suspend, export CSV).
+User Detail (/admin/users/[id]):
+
+Show user profile, list of projects, collection size, last 20 searches, feedback tickets, flags raised, admin action history.
+Actions: Suspend, Ban, Reset password (via Firebase), Promote to Admin, Delete (with confirmation).
+Editable field: Admin notes (users.admin_notes).
+Project Browser (/admin/projects):
+
+Table: [Title, Owner (link), Field, Stage, Papers saved, Collaborators count, Created date, Actions (view)].
+Click project to view read-only: outline tree, papers, seed sets (without edit).
+Paper Database (/admin/papers):
+
+Table: [Title (tooltip), Authors, Year, Source badge, Citation count, Open Access (check), Times saved, Actions].
+Search/filter by source/year/OA, sort by citation/year/saves.
+Feedback (/admin/feedback):
+
+List: [Type badge (bug/feature/etc), Subject, User (link), Date, Status badge, Actions].
+Detail view (modal): Full message, user info, admin notes, status dropdown, history of status changes.
+Stats: Open count, resolved this week, avg response time.
+Flag Queue (/admin/flags):
+
+List: [Entity type badge, Reason, Flagged by (link), Date, Status, Actions].
+Review modal: Show flagged content (paper title or user detail). Actions: Dismiss flag, Delete content, Warn user, Suspend user. All actions logged to admin_activity_log.
+Analytics (/admin/analytics):
+
+Date range picker (7/30/90 days or custom).
+Engagement: DAU/MAU, session length, feature usage breakdown.
+Search: Top 20 queries, zero-result queries, search-to-save conversion.
+Content: Most saved papers, popular fields, stage distribution.
+Charts downloadable as CSV.
+Source: analytics_events table (log events such as paper_saved, search_run, graph_expanded, etc). Insert events asynchronously (non-blocking).
+Platform Settings (/admin/settings):
+
+Feature Flags: Toggles for ML Gap Detection, Collaboration, Defence Mode (from platform_settings.feature_flags).
+Announcement Banner: On/off toggle and message (shown in app topbar when active).
+Service Status:
+ML API: ping and display last response time.
+External APIs (Semantic Scholar, OpenAlex, arXiv, CrossRef): health check (green/red).
+Cache Management: “Flush Redis” button (calls API route to redis.flushall()).
+Admin Accounts: List current admins (emails); allow revoking admin role (except self) directly.
+───────────────────────────────────────── COMPONENT ARCHITECTURE RULES ─────────────────────────────────────────
+
+UI Primitives (/components/ui/) are reusable base components (Button, Modal, etc).
+Feature Components (/components/[feature]/) for each feature module.
+Layout Components (/components/layout/) for Sidebar, Topbar, etc.
+No inline styles – use Tailwind utility classes and defined color/spacing tokens.
+All components use strict TypeScript types (no any). Validate all props with Zod where applicable.
+Use Radix UI primitives for Dialog, Tooltip, DropdownMenu, Checkbox, Select (styling via Tailwind).
+Fetch real data via API when ready, but use lib/mockData.ts for prototyping UI states.
+Every page/component should demonstrate: Empty state (no data), Loading state (skeletons), Populated state, and Error state.
+───────────────────────────────────────── EXTERNAL API INTEGRATIONS ─────────────────────────────────────────
+
+All external data fetching is server-side (Next.js API routes or Server Actions).
+Caching: Cache API responses in Redis (24h TTL; use shorter if data changes often).
+Rate limits: Combine data from multiple sources to stay under free-tier limits; throttle/batch calls as needed.
+Unified Paper type (used throughout):
+
+ts
+Copy
+type Paper = {
+  id: string;
+  doi?: string;
+  arxivId?: string;
+  title: string;
+  abstract?: string;
+  authors: { name: string; affiliation?: string; hIndex?: number }[];
+  year: number;
+  citationCount: number;
+  referenceCount: number;
+  openAccess: boolean;
+  fieldsOfStudy: string[];
+  source: 'semantic_scholar' | 'openalex' | 'arxiv' | 'crossref' | 'pubmed' | 'core' | 'europe_pmc' | 'doaj';
+  url?: string;
+  embedding?: number[];  // 768-dimension vector for semantic similarity
+};
+Use it to normalize responses from all APIs.
+
+API Sources (queries in parallel, dedupe by DOI):
+
+Semantic Scholar (primary graph data).
+OpenAlex (broad coverage, institutions, fields).
+CrossRef (DOI resolution, citation counts).
+PubMed/NCBI (biomed focus).
+arXiv (CS, physics, math preprints).
+CORE (open-access repository aggregator).
+Europe PMC (EU biomedical).
+DOAJ (journal-level open-access data).
+Key endpoints (server-side): Semantic Scholar Graph API, OpenAlex API, arXiv API, CrossRef REST, PubMed E-utilities, CORE API, EuropePMC REST, DOAJ REST. Normalize all fields into the above schema.
+
+───────────────────────────────────────── KEY DEPENDENCIES ─────────────────────────────────────────
+
+json
+Copy
+{
+  "next": "^14",
+  "typescript": "^5",
+  "tailwindcss": "^3",
+  "firebase": "^10",
+  "firebase-admin": "^12",
+  "@supabase/supabase-js": "^2",
+  "reactflow": "latest",
+  "d3": "latest",
+  "@dnd-kit/core": "latest",
+  "@dnd-kit/sortable": "latest",
+  "@upstash/redis": "latest",
+  "lucide-react": "latest",
+  "zod": "latest",
+  "axios": "latest",
+  "date-fns": "latest",
+  "recharts": "latest",
+  "framer-motion": "latest",
+  "@radix-ui/react-dialog": "latest",
+  "@radix-ui/react-tooltip": "latest",
+  "@radix-ui/react-dropdown-menu": "latest",
+  "@radix-ui/react-checkbox": "latest",
+  "@radix-ui/react-select": "latest",
+  "docx": "latest",
+  "jspdf": "latest"
+}
+───────────────────────────────────────── SEO & METADATA ─────────────────────────────────────────
+
+Use Next.js Metadata API (app/layout.tsx and per-page metadata objects) for titles, descriptions, and canonical URLs. In the root layout: title: { template: '%s | ThesisMaps', default: 'ThesisMaps' }
+.
+Metadata per page: <title>, meta description, <link rel="canonical">, OpenGraph and Twitter tags (populate image, title, description). Use route handlers for /robots.txt and /sitemap.xml (Next.js auto-generates from robots.ts and sitemap.ts files)
+.
+Landing Page: Full OG tags and Twitter Card. Embed JSON-LD <script type="application/ld+json"> describing the SoftwareApplication (schema.org). Sanitize JSON-LD to prevent XSS by escaping < as \u003c
+. (Use a native <script> tag, not Next’s Script, as recommended
+.)
+Images: Use Next.js <Image> for all images (responsive sizing, lazy loading)
+. Provide descriptive alt text on every image for accessibility and SEO
+.
+Semantic HTML: Structure pages with <main>, <nav>, <section>, <article>, <aside>, etc. for better accessibility and SEO
+.
+Admin pages: Add <meta name="robots" content="noindex"> (or set via Metadata API) to all /admin routes (they should not be crawlable).
+───────────────────────────────────────── VERCEL CONFIG ───────────────────────────────────────── vercel.json:
+
+json
+Copy
+{
+  "framework": "nextjs",
+  "buildCommand": "pnpm build",
+  "devCommand": "pnpm dev",
+  "installCommand": "pnpm install",
+  "regions": ["iad1"]  // e.g. North Virginia
+}
+Deploy to Vercel (Pro plan).
+
+.env.example:
+
+makefile
+Copy
+NEXT_PUBLIC_FIREBASE_API_KEY=
+NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=
+NEXT_PUBLIC_FIREBASE_PROJECT_ID=
+NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=
+NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=
+NEXT_PUBLIC_FIREBASE_APP_ID=
+FIREBASE_ADMIN_PROJECT_ID=
+FIREBASE_ADMIN_CLIENT_EMAIL=
+FIREBASE_ADMIN_PRIVATE_KEY=
+NEXT_PUBLIC_SUPABASE_URL=
+NEXT_PUBLIC_SUPABASE_ANON_KEY=
+SUPABASE_SERVICE_ROLE_KEY=
+UPSTASH_REDIS_REST_URL=
+UPSTASH_REDIS_REST_TOKEN=
+ML_SERVICE_URL=
+SEMANTIC_SCHOLAR_API_KEY=
+Store secrets in environment variables (never hard-code)
+.
+
+───────────────────────────────────────── BUILD ORDER ─────────────────────────────────────────
+
+Setup: Scaffold Next.js + TypeScript + Tailwind + pnpm.
+Auth/DB: Initialize Firebase (client + admin) and Supabase; run SQL schema.
+Design System: Configure fonts via next/font, color tokens, base UI primitives (Button, Input, etc).
+Landing Page: Hero, feature sections, stage strip, differentiators.
+Authentication: Login/Signup pages, AuthContext, middleware guards.
+Dashboard: Project setup, stage tracker, stats, research debt panel.
+Search: Multi-source API queries (parallel calls), filters, result list, Redis caching.
+Knowledge Graph: React Flow graph canvas, node/edge types, detail panel, export.
+Outline Builder: DnD sections, coverage score, export DOCX/PDF.
+Remaining App Pages: Timeline, Seeds, Gaps, Defence, Collaborate, Settings.
+Admin Panel: Layout + pages in order: Overview → Users → Projects → Papers → Feedback → Flags → Analytics → Settings.
+ML Integration: Async FastAPI calls for gap detection, keyword extraction, draft generation.
+Exports: Implement PDF, CSV, BibTeX exports (server-side and/or client).
+Event Logging: Instrument key actions with analytics_events (e.g. paper_saved, search_run).
+SEO: Add Metadata API, sitemap, robots, JSON-LD, alt texts, and test with Google tools.
+Ensure type safety (no implicit any), input validation, and security (CSP headers, content sanitization)
+ throughout.
+
+pgsql
+Copy
+
+## Annotations and Justification
+
+- *Next.js & SEO:* We use Next.js 14’s Metadata API to programmatically set <title>, OG and canonical tags, following official guidance (e.g. title.template: '%s | ThesisMaps'【6†L165-L174】). We also implement /robots.txt and /sitemap.xml using Next.js route handlers as recommended【6†L98-L102】.  
+- *Images & Fonts:* Images are served via Next.js <Image> (optimizer handles responsive sizing and lazy loading)【16†L688-L697】. Fonts are loaded with next/font/google (display='swap', preload=true) to avoid render-blocking【16†L688-L697】. Descriptive alt text is provided for accessibility/SEO【2†L72-L75】.  
+- *Semantic HTML:* Using <main>, <nav>, etc. is critical for accessibility and SEO【13†L176-L184】【13†L189-L190】. The prompt enforces semantic structure (no “div soup”) to improve maintainability and SEO.  
+- *Security:* We validate all API inputs with Zod (prevent injection)【9†L98-L103】 and store secrets in process.env. A strict Content Security Policy header is configured via next.config.js to mitigate XSS【9†L139-L143】. JSON-LD is embedded via <script> with escaped < (XSS-safe)【18†L529-L537】【18†L559-L562】.  
+- *Miscellaneous Best Practices:* The design rules forbid non-essential colors and animations. Monitoring (Vercel Analytics, Sentry) is added for reliability. Draggable outlines use @dnd-kit. All the sections correspond exactly to the provided spec (pages, components, features).
+
+Each part of this prompt directly implements items from the specification above, ensuring nothing from the original document is omitted and that modern coding, security, and SEO best practices are applied (as supported by industry guides【2†L72-L75】【6†L165-L174】【9†L98-L103】【13†L176-L184】).

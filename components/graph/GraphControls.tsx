@@ -24,6 +24,8 @@ const HEATMAP_OPTIONS = [
   { value: 'relevance', label: 'Color by Relevance' },
 ];
 
+const iconBtn = 'p-2 border-2 border-black bg-white text-black hover:bg-black hover:text-white transition-colors';
+
 export function GraphControls({
   onZoomIn,
   onZoomOut,
@@ -36,20 +38,20 @@ export function GraphControls({
 }: GraphControlsProps) {
   return (
     <div className="absolute top-4 right-4 z-10 flex flex-col gap-2">
-      <div className="bg-background-dark/90 border border-white/10 rounded-md p-2 flex flex-col gap-1">
+      <div className="flex flex-col gap-1">
         <Tooltip content="Zoom in" side="left">
-          <button onClick={onZoomIn} aria-label="Zoom in" className="p-2 rounded hover:bg-white/10 text-white transition-colors">
-            <ZoomIn size={16} strokeWidth={1.5} />
+          <button onClick={onZoomIn} aria-label="Zoom in" className={iconBtn}>
+            <ZoomIn size={16} strokeWidth={2} />
           </button>
         </Tooltip>
         <Tooltip content="Zoom out" side="left">
-          <button onClick={onZoomOut} aria-label="Zoom out" className="p-2 rounded hover:bg-white/10 text-white transition-colors">
-            <ZoomOut size={16} strokeWidth={1.5} />
+          <button onClick={onZoomOut} aria-label="Zoom out" className={iconBtn}>
+            <ZoomOut size={16} strokeWidth={2} />
           </button>
         </Tooltip>
         <Tooltip content="Fit view" side="left">
-          <button onClick={onFitView} aria-label="Fit view" className="p-2 rounded hover:bg-white/10 text-white transition-colors">
-            <Maximize2 size={16} strokeWidth={1.5} />
+          <button onClick={onFitView} aria-label="Fit view" className={iconBtn}>
+            <Maximize2 size={16} strokeWidth={2} />
           </button>
         </Tooltip>
         <Tooltip content={showMinimap ? 'Hide minimap' : 'Show minimap'} side="left">
@@ -57,19 +59,22 @@ export function GraphControls({
             onClick={onToggleMinimap}
             aria-label="Toggle minimap"
             aria-pressed={showMinimap}
-            className={['p-2 rounded transition-colors text-white', showMinimap ? 'bg-white/20' : 'hover:bg-white/10'].join(' ')}
+            className={[
+              'p-2 border-2 border-black transition-colors',
+              showMinimap ? 'bg-black text-white' : 'bg-white text-black hover:bg-black hover:text-white',
+            ].join(' ')}
           >
-            <Map size={16} strokeWidth={1.5} />
+            <Map size={16} strokeWidth={2} />
           </button>
         </Tooltip>
-        <Tooltip content="Export graph" side="left">
-          <button onClick={onExport} aria-label="Export graph" className="p-2 rounded hover:bg-white/10 text-white transition-colors">
-            <Download size={16} strokeWidth={1.5} />
+        <Tooltip content="Export as SVG" side="left">
+          <button onClick={onExport} aria-label="Export graph as SVG" className={iconBtn}>
+            <Download size={16} strokeWidth={2} />
           </button>
         </Tooltip>
       </div>
 
-      <div className="bg-background-dark/90 border border-white/10 rounded-md p-2 w-44">
+      <div className="w-44">
         <Select
           value={heatmapMode}
           onValueChange={(v) => onHeatmapChange(v as HeatmapMode)}

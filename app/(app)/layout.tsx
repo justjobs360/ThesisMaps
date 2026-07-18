@@ -1,12 +1,20 @@
+import type { Metadata } from 'next';
 import { SidebarProvider } from '@/context/SidebarContext';
+import { ProjectProvider } from '@/context/ProjectContext';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { Topbar } from '@/components/layout/Topbar';
 import { AppFooter } from '@/components/layout/AppFooter';
 import { AuthGuard } from '@/components/auth/AuthGuard';
 
+// Applies to every /(app) route — keep the authenticated workspace out of search indexes.
+export const metadata: Metadata = {
+  robots: { index: false, follow: false },
+};
+
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
     <AuthGuard>
+      <ProjectProvider>
       <SidebarProvider>
         <div className="min-h-screen bg-white">
           <Sidebar />
@@ -21,6 +29,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           </main>
         </div>
       </SidebarProvider>
+      </ProjectProvider>
     </AuthGuard>
   );
 }

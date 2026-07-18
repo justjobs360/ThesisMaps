@@ -9,16 +9,16 @@ export const metadata: Metadata = {
 
 export default function OutlinePage() {
   return (
-    <div className="flex flex-col h-[calc(100vh-52px-48px)] -m-6 space-y-0">
-      <div className="px-6 py-4 border-b border-border bg-background flex-shrink-0">
+    <div className="flex flex-col h-[calc(100vh-64px-72px)] -m-6 md:-m-12 space-y-0">
+      <div className="px-6 md:px-12 py-4 border-b-2 border-black bg-white flex-shrink-0">
         <PageHeader
           title="Outline Builder"
           subtitle="Structure your thesis chapters and track literature coverage per section."
         />
       </div>
-      <div className="flex-1 p-6 overflow-hidden">
+      <div className="flex-1 p-6 md:p-12 overflow-hidden">
         <div className="h-full">
-          <OutlineBuilder projectId="proj1" />
+          <OutlineBuilder />
         </div>
       </div>
     </div>

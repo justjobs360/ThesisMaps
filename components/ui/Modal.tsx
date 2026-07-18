@@ -37,24 +37,24 @@ export function Modal({ open, onClose, title, description, children, maxWidth = 
                 transition={{ duration: 0.2, ease: 'easeOut' }}
                 className={[
                   'fixed left-1/2 top-1/2 z-50 w-full -translate-x-1/2 -translate-y-1/2',
-                  'rounded-md bg-surface border border-border shadow-md p-6',
+                  'bg-white border-2 border-black shadow-impact p-6',
                   maxWidth,
                 ].join(' ')}
               >
-                <div className="flex items-start justify-between mb-4">
+                <div className="flex items-start justify-between mb-4 pb-4 border-b-2 border-black">
                   <div>
-                    <Dialog.Title className="text-lg font-semibold font-sans text-text-primary">
+                    <Dialog.Title className="font-serif text-2xl font-black uppercase tracking-tight text-black">
                       {title}
                     </Dialog.Title>
                     {description ? (
-                      <Dialog.Description className="mt-1 text-sm text-text-muted font-sans">
+                      <Dialog.Description className="mt-1 text-xs text-text-muted font-sans">
                         {description}
                       </Dialog.Description>
                     ) : null}
                   </div>
                   <Dialog.Close asChild>
-                    <button className="p-1 rounded hover:bg-background text-text-muted transition-colors" aria-label="Close modal">
-                      <X size={16} strokeWidth={1.5} />
+                    <button className="p-1 border-2 border-black hover:bg-black hover:text-white text-black transition-colors" aria-label="Close modal">
+                      <X size={16} strokeWidth={2} />
                     </button>
                   </Dialog.Close>
                 </div>

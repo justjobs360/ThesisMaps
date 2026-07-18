@@ -8,7 +8,7 @@ type SkeletonProps = {
 export function Skeleton({ className = '' }: { className?: string }) {
   return (
     <div
-      className={['animate-pulse rounded bg-border/60', className].join(' ')}
+      className={['animate-pulse bg-black/10', className].join(' ')}
       aria-hidden="true"
     />
   );
@@ -29,7 +29,7 @@ export function SkeletonText({ lines = 3, className = '' }: SkeletonProps) {
 
 export function SkeletonCard({ className = '' }: { className?: string }) {
   return (
-    <div className={['rounded-md border border-border bg-surface p-4 space-y-3', className].join(' ')} aria-hidden="true">
+    <div className={['border-2 border-black bg-white p-4 space-y-3', className].join(' ')} aria-hidden="true">
       <Skeleton className="h-5 w-4/5" />
       <SkeletonText lines={2} />
       <div className="flex gap-2">

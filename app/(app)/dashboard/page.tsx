@@ -1,16 +1,13 @@
-import type { Metadata } from 'next';
+'use client';
+
 import { PageHeader } from '@/components/layout/PageHeader';
 import { StageTracker } from '@/components/dashboard/StageTracker';
 import { StatCard } from '@/components/dashboard/StatCard';
 import { ResearchDebtPanel } from '@/components/dashboard/ResearchDebtPanel';
-import { MOCK_PROJECT } from '@/lib/mockData';
+import { useProject } from '@/hooks/useProject';
+import { THESIS_STAGES } from '@/types/thesis';
 import { ArrowRight } from 'lucide-react';
 import Link from 'next/link';
-
-export const metadata: Metadata = {
-  title: 'Dashboard',
-  robots: { index: false },
-};
 
 const SUGGESTED_ACTIONS = [
   { label: 'Run gap analysis on your library', href: '/gaps' },
@@ -19,14 +16,21 @@ const SUGGESTED_ACTIONS = [
 ];
 
 export default function DashboardPage() {
+  const { currentProject, loading } = useProject();
+
+  const title = currentProject?.title ?? 'My Thesis';
+  const stage = currentProject?.currentStage ?? 'research_proposal';
+  const stageLabel = THESIS_STAGES.find((s) => s.id === stage)?.label ?? 'Proposal';
+  const field = currentProject?.field?.trim() ? currentProject.field : 'Field not set';
+
   return (
     <div className="space-y-6">
       <PageHeader
-        title={MOCK_PROJECT.title}
-        subtitle={`Current stage: Literature Review · ${MOCK_PROJECT.field}`}
+        title={loading ? 'Loading project…' : title}
+        subtitle={`Current stage: ${stageLabel} · ${field}`}
       />
 
-      <StageTracker currentStage={MOCK_PROJECT.currentStage} />
+      <StageTracker currentStage={stage} />
 
       {/* Stats */}
       <section aria-labelledby="stats-heading">

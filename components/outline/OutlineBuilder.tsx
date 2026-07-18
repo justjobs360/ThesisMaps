@@ -1,36 +1,49 @@
 'use client';
 
-import React, { useState } from 'react';
-import {
-  DndContext, closestCenter, type DragEndEvent,
-} from '@dnd-kit/core';
+import React, { useEffect, useState } from 'react';
+import { DndContext, closestCenter, type DragEndEvent } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy, arrayMove } from '@dnd-kit/sortable';
-import { Plus, FileText, Download, X } from 'lucide-react';
-import { Button } from '@/components/ui/Button';
+import { Plus, FileText, X } from 'lucide-react';
 import { ChapterSection } from './ChapterSection';
 import { CoverageScore } from './CoverageScore';
 import { useOutline } from '@/hooks/useOutline';
-import { MOCK_PAPERS } from '@/lib/mockData';
+import { useProject } from '@/hooks/useProject';
+import { apiClient } from '@/lib/apiClient';
+import type { SavedPaper } from '@/types/paper';
 
-export function OutlineBuilder({ projectId }: { projectId: string }) {
+export function OutlineBuilder() {
+  const { projectId } = useProject();
   const {
-    sections, selectedSection, selectedSectionId,
-    setSelectedSectionId, addSection, reorderSections,
+    sections, selectedSection, selectedSectionId, setSelectedSectionId,
+    loading, addSection, reorderSections, deleteSection,
+    sectionPapers, sectionPapersLoading, assignPaper, unassignPaper,
   } = useOutline(projectId);
 
   const [showTree, setShowTree] = useState(false);
   const [newTitle, setNewTitle] = useState('');
+  const [library, setLibrary] = useState<SavedPaper[]>([]);
+
+  // Load the project's saved library once — used to assign papers to sections.
+  useEffect(() => {
+    if (!projectId) return;
+    apiClient
+      .get<{ papers: SavedPaper[] }>(`/api/papers/save?projectId=${projectId}`)
+      .then(({ papers }) => setLibrary(papers))
+      .catch(() => setLibrary([]));
+  }, [projectId, sectionPapers.length]);
 
   function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event;
     if (over && active.id !== over.id) {
       const oldIndex = sections.findIndex((s) => s.id === active.id);
       const newIndex = sections.findIndex((s) => s.id === over.id);
-      reorderSections(arrayMove(sections, oldIndex, newIndex));
+      void reorderSections(arrayMove(sections, oldIndex, newIndex));
     }
   }
 
   const rootSections = sections.filter((s) => !s.parentId);
+  const linkedIds = new Set(sectionPapers.map((p) => p.id));
+  const assignable = library.filter((s) => s.paper?.id && !linkedIds.has(s.paper.id));
 
   return (
     <div className="flex flex-col lg:flex-row h-full gap-0 border-2 border-black overflow-hidden bg-white shadow-impact">
@@ -48,11 +61,11 @@ export function OutlineBuilder({ projectId }: { projectId: string }) {
       </div>
 
       {/* Left outline tree */}
-      <aside 
+      <aside
         className={[
           'w-full lg:w-72 flex-shrink-0 bg-white border-b-2 lg:border-b-0 lg:border-r-2 border-black flex flex-col transition-all',
-          showTree ? 'block' : 'hidden lg:flex'
-        ].join(' ')} 
+          showTree ? 'block' : 'hidden lg:flex',
+        ].join(' ')}
         aria-label="Outline sections"
       >
         <div className="p-4 border-b-2 border-black bg-black">
@@ -60,36 +73,50 @@ export function OutlineBuilder({ projectId }: { projectId: string }) {
         </div>
 
         <div className="flex-1 overflow-y-auto py-4">
-          <DndContext collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-            <SortableContext items={rootSections.map((s) => s.id)} strategy={verticalListSortingStrategy}>
-              {rootSections.map((section) => (
-                <React.Fragment key={section.id}>
-                  <ChapterSection
-                    section={section}
-                    isSelected={selectedSectionId === section.id}
-                    onClick={() => {
-                      setSelectedSectionId(section.id);
-                      if (window.innerWidth < 1024) setShowTree(false);
-                    }}
-                  />
-                  {sections
-                    .filter((s) => s.parentId === section.id)
-                    .map((child) => (
-                      <ChapterSection
-                        key={child.id}
-                        section={child}
-                        isSelected={selectedSectionId === child.id}
-                        onClick={() => {
-                          setSelectedSectionId(child.id);
-                          if (window.innerWidth < 1024) setShowTree(false);
-                        }}
-                        depth={1}
-                      />
-                    ))}
-                </React.Fragment>
+          {loading ? (
+            <div className="space-y-2 px-3">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className="h-9 border-2 border-black bg-black/5 animate-pulse" />
               ))}
-            </SortableContext>
-          </DndContext>
+            </div>
+          ) : rootSections.length === 0 ? (
+            <p className="px-4 text-[10px] font-sans font-bold uppercase tracking-wider text-black/40">
+              No sections yet. Add one below.
+            </p>
+          ) : (
+            <DndContext collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+              <SortableContext items={rootSections.map((s) => s.id)} strategy={verticalListSortingStrategy}>
+                {rootSections.map((section) => (
+                  <React.Fragment key={section.id}>
+                    <ChapterSection
+                      section={section}
+                      isSelected={selectedSectionId === section.id}
+                      onClick={() => {
+                        setSelectedSectionId(section.id);
+                        if (window.innerWidth < 1024) setShowTree(false);
+                      }}
+                      onDelete={() => void deleteSection(section.id)}
+                    />
+                    {sections
+                      .filter((s) => s.parentId === section.id)
+                      .map((child) => (
+                        <ChapterSection
+                          key={child.id}
+                          section={child}
+                          isSelected={selectedSectionId === child.id}
+                          onClick={() => {
+                            setSelectedSectionId(child.id);
+                            if (window.innerWidth < 1024) setShowTree(false);
+                          }}
+                          onDelete={() => void deleteSection(child.id)}
+                          depth={1}
+                        />
+                      ))}
+                  </React.Fragment>
+                ))}
+              </SortableContext>
+            </DndContext>
+          )}
         </div>
 
         <div className="p-4 border-t-2 border-black bg-white">
@@ -97,7 +124,7 @@ export function OutlineBuilder({ projectId }: { projectId: string }) {
             onSubmit={(e) => {
               e.preventDefault();
               if (newTitle.trim()) {
-                addSection(newTitle.trim());
+                void addSection(newTitle.trim());
                 setNewTitle('');
               }
             }}
@@ -122,44 +149,73 @@ export function OutlineBuilder({ projectId }: { projectId: string }) {
           <>
             <div className="p-6 border-b-2 border-black flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div>
-                 <p className="text-[10px] font-sans font-black uppercase tracking-widest text-accent mb-1">Active Section</p>
-                 <h2 className="font-serif text-3xl font-black text-black tracking-tighter uppercase">{selectedSection.title}</h2>
+                <p className="text-[10px] font-sans font-black uppercase tracking-widest text-accent mb-1">Active Section</p>
+                <h2 className="font-serif text-3xl font-black text-black tracking-tighter uppercase">{selectedSection.title}</h2>
               </div>
               <div className="flex items-center gap-4">
-                {selectedSection.coverageScore !== undefined ? (
-                  <CoverageScore score={selectedSection.coverageScore} />
-                ) : null}
-                <Button size="sm" variant="primary" className="h-10 px-6 uppercase tracking-widest font-black text-[10px]">
-                  <Download size={16} strokeWidth={2.5} className="mr-2" /> Export
-                </Button>
+                {selectedSection.coverageScore !== undefined ? <CoverageScore score={selectedSection.coverageScore} /> : null}
               </div>
             </div>
 
             <div className="flex-1 overflow-y-auto p-6 space-y-8">
               <div>
-                <p className="text-[10px] font-sans font-black uppercase tracking-widest text-black/40 mb-4">Linked Evidence (PPR REPO)</p>
+                <p className="text-[10px] font-sans font-black uppercase tracking-widest text-black/40 mb-4">
+                  Linked Evidence ({sectionPapers.length})
+                </p>
                 <div className="space-y-3">
-                  {MOCK_PAPERS.slice(0, 3).map((paper) => (
-                    <div key={paper.id} className="flex items-center justify-between gap-4 p-4 border-2 border-black bg-white shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]">
-                      <div className="flex-1 min-w-0">
-                        <p className="text-[11px] font-sans font-black text-black uppercase tracking-tight truncate">{paper.title}</p>
-                        <p className="text-[10px] text-black/60 font-sans font-bold uppercase tracking-tighter mt-1">{paper.year} // {paper.authors[0]?.name.toUpperCase()}</p>
-                      </div>
-                      <button className="text-black/40 hover:text-red-600 transition-colors">
-                         <X size={14} strokeWidth={2.5} />
-                      </button>
+                  {sectionPapersLoading ? (
+                    Array.from({ length: 2 }).map((_, i) => (
+                      <div key={i} className="h-16 border-2 border-black bg-black/5 animate-pulse" />
+                    ))
+                  ) : sectionPapers.length === 0 ? (
+                    <div className="p-6 border-2 border-dashed border-black/30 text-center">
+                      <p className="text-[10px] font-sans font-bold uppercase tracking-wider text-black/40">No evidence linked yet</p>
                     </div>
-                  ))}
+                  ) : (
+                    sectionPapers.map((paper) => (
+                      <div key={paper.id} className="flex items-center justify-between gap-4 p-4 border-2 border-black bg-white shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]">
+                        <div className="flex-1 min-w-0">
+                          <p className="text-[11px] font-sans font-black text-black uppercase tracking-tight truncate">{paper.title}</p>
+                          <p className="text-[10px] text-black/60 font-sans font-bold uppercase tracking-tighter mt-1">
+                            {paper.year} // {paper.authors[0]?.name.toUpperCase() ?? 'UNKNOWN'}
+                          </p>
+                        </div>
+                        <button
+                          onClick={() => void unassignPaper(selectedSection.id, paper.id)}
+                          aria-label="Remove paper from section"
+                          className="text-black/40 hover:text-red-600 transition-colors"
+                        >
+                          <X size={14} strokeWidth={2.5} />
+                        </button>
+                      </div>
+                    ))
+                  )}
                 </div>
               </div>
 
+              {/* Assign from library */}
               <div>
-                <p className="text-[10px] font-sans font-black uppercase tracking-widest text-black/40 mb-3">Contextual Synthesis</p>
-                <textarea
-                  placeholder="ENTER RESEARCH NOTES AND SYNTHESIS HERE..."
-                  rows={8}
-                  className="w-full border-2 border-black bg-white p-4 text-xs font-sans font-bold text-black placeholder:text-black/20 focus:outline-none focus:border-accent resize-none shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]"
-                />
+                <p className="text-[10px] font-sans font-black uppercase tracking-widest text-black/40 mb-3">
+                  Assign From Library ({assignable.length})
+                </p>
+                {assignable.length === 0 ? (
+                  <p className="text-[10px] font-sans font-bold uppercase tracking-wider text-black/30">
+                    Save papers from Search, then assign them here.
+                  </p>
+                ) : (
+                  <div className="space-y-2">
+                    {assignable.slice(0, 8).map((saved) => (
+                      <button
+                        key={saved.id}
+                        onClick={() => void assignPaper(selectedSection.id, saved.paper.id)}
+                        className="w-full flex items-center justify-between gap-3 p-3 border-2 border-black bg-white hover:bg-black hover:text-white transition-colors group text-left"
+                      >
+                        <span className="text-[11px] font-sans font-bold uppercase tracking-tight truncate">{saved.paper.title}</span>
+                        <Plus size={14} strokeWidth={3} className="flex-shrink-0" />
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           </>

@@ -21,12 +21,12 @@ type DataTableProps<T> = {
 export function DataTable<T>({ columns, data, loading, emptyMessage = 'No results found.', rowKey }: DataTableProps<T>) {
   if (loading) {
     return (
-      <div className="border border-border rounded-md overflow-hidden">
+      <div className="border-2 border-black overflow-hidden">
         <table className="w-full text-sm font-sans">
-          <thead className="bg-background border-b border-border">
+          <thead className="bg-black">
             <tr>
               {columns.map((col) => (
-                <th key={String(col.key)} className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-text-muted">
+                <th key={String(col.key)} className="px-4 py-3 text-left text-[10px] font-black uppercase tracking-widest text-white">
                   {col.header}
                 </th>
               ))}
@@ -34,7 +34,7 @@ export function DataTable<T>({ columns, data, loading, emptyMessage = 'No result
           </thead>
           <tbody>
             {Array.from({ length: 5 }).map((_, i) => (
-              <tr key={i} className="border-b border-border last:border-0">
+              <tr key={i} className="border-b-2 border-black last:border-0">
                 {columns.map((col) => (
                   <td key={String(col.key)} className="px-4 py-3">
                     <Skeleton className="h-4 w-full" />
@@ -50,19 +50,19 @@ export function DataTable<T>({ columns, data, loading, emptyMessage = 'No result
 
   if (!data.length) {
     return (
-      <div className="border border-border rounded-md p-12 text-center">
-        <p className="text-text-muted font-sans text-sm">{emptyMessage}</p>
+      <div className="border-2 border-black p-12 text-center">
+        <p className="text-black/40 font-sans font-bold uppercase tracking-widest text-[10px]">{emptyMessage}</p>
       </div>
     );
   }
 
   return (
-    <div className="border border-border rounded-md overflow-hidden">
+    <div className="border-2 border-black overflow-hidden">
       <table className="w-full text-sm font-sans">
-        <thead className="bg-background border-b border-border">
+        <thead className="bg-black">
           <tr>
             {columns.map((col) => (
-              <th key={String(col.key)} className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-text-muted">
+              <th key={String(col.key)} className="px-4 py-3 text-left text-[10px] font-black uppercase tracking-widest text-white">
                 {col.header}
               </th>
             ))}
@@ -70,9 +70,9 @@ export function DataTable<T>({ columns, data, loading, emptyMessage = 'No result
         </thead>
         <tbody>
           {data.map((row) => (
-            <tr key={rowKey(row)} className="border-b border-border last:border-0 hover:bg-background transition-colors">
+            <tr key={rowKey(row)} className="border-b-2 border-black last:border-0 hover:bg-black/5 transition-colors">
               {columns.map((col) => (
-                <td key={String(col.key)} className="px-4 py-3 text-text-primary">
+                <td key={String(col.key)} className="px-4 py-3 text-black">
                   {col.render
                     ? col.render(row)
                     : String((row as Record<string, unknown>)[col.key as string] ?? '')}
