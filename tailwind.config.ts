@@ -19,7 +19,7 @@ const config: Config = {
         'text-primary': '#000000',
         'text-muted': '#666666',
         border: '#000000',
-        'graph-bg': '#000000',
+        'graph-bg': '#FFFFFF',
         success: '#2D6A4F',
         warning: '#B45309',
         danger: '#FF0000',

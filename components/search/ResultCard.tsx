@@ -11,6 +11,7 @@ import type { Paper } from '@/types/paper';
 
 type ResultCardProps = {
   paper: Paper;
+  alreadySaved?: boolean;
   onSaved?: (paper: Paper) => void;
 };
 
@@ -27,13 +28,15 @@ const SOURCE_LABELS: Record<string, string> = {
 
 type SaveState = 'idle' | 'saving' | 'saved' | 'error';
 
-export function ResultCard({ paper, onSaved }: ResultCardProps) {
+export function ResultCard({ paper, alreadySaved = false, onSaved }: ResultCardProps) {
   const { projectId } = useProject();
   const { track } = useAnalytics();
   const [state, setState] = useState<SaveState>('idle');
+  // Already in the library (from a prior session) OR just saved this session.
+  const isSaved = state === 'saved' || alreadySaved;
 
   async function handleSave() {
-    if (!projectId || state === 'saving' || state === 'saved') return;
+    if (!projectId || state === 'saving' || isSaved) return;
     setState('saving');
     try {
       await apiClient.post('/api/papers/save', { projectId, paper });
@@ -66,13 +69,13 @@ export function ResultCard({ paper, onSaved }: ResultCardProps) {
 
         <Button
           size="sm"
-          variant={state === 'saved' ? 'ghost' : 'secondary'}
+          variant={isSaved ? 'ghost' : 'secondary'}
           onClick={handleSave}
-          disabled={!projectId || state === 'saving' || state === 'saved'}
-          aria-label={state === 'saved' ? 'Saved to project' : 'Save to project'}
+          disabled={!projectId || state === 'saving' || isSaved}
+          aria-label={isSaved ? 'Saved to project' : 'Save to project'}
         >
-          {state === 'saved' ? <Check size={14} strokeWidth={2} /> : <BookmarkPlus size={14} strokeWidth={2} />}
-          {state === 'saved' ? 'Saved' : state === 'saving' ? 'Saving' : state === 'error' ? 'Retry' : 'Save'}
+          {isSaved ? <Check size={14} strokeWidth={2} /> : <BookmarkPlus size={14} strokeWidth={2} />}
+          {isSaved ? 'Saved' : state === 'saving' ? 'Saving' : state === 'error' ? 'Retry' : 'Save'}
         </Button>
       </div>
 

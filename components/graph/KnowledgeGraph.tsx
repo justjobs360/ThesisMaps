@@ -32,9 +32,9 @@ function buildEdges(graphEdges: GraphData['edges']): Edge[] {
 }
 
 const EDGE_COLORS: Record<string, string> = {
-  citation: '#CBD5E1',
+  citation: '#64748B',
   semantic_similarity: '#0066FF',
-  co_author: '#64748B',
+  co_author: '#94A3B8',
 };
 
 type KnowledgeGraphProps = {
@@ -106,11 +106,11 @@ export function KnowledgeGraph({ data, showMinimap, heatmapMode, onToggleMinimap
         const y = n.position.y - minY + pad;
         const color = nodeColor(n.data, heatmapMode, maxCitations);
         const title = (n.data.paper.title || '').slice(0, 40).replace(/[<&>]/g, '');
-        return `<g><rect x="${x}" y="${y}" width="${W}" height="${H}" fill="#111111" stroke="#333333"/><rect x="${x}" y="${y}" width="4" height="${H}" fill="${color}"/><text x="${x + 12}" y="${y + 26}" fill="#ffffff" font-family="sans-serif" font-size="11">${title}</text><text x="${x + 12}" y="${y + 46}" fill="#888888" font-family="sans-serif" font-size="10">${n.data.paper.year || ''} · ${n.data.paper.citationCount} cit.</text></g>`;
+        return `<g><rect x="${x}" y="${y}" width="${W}" height="${H}" fill="#FFFFFF" stroke="#000000" stroke-width="2"/><rect x="${x}" y="${y}" width="4" height="${H}" fill="${color}"/><text x="${x + 12}" y="${y + 26}" fill="#000000" font-family="sans-serif" font-size="11">${title}</text><text x="${x + 12}" y="${y + 46}" fill="#666666" font-family="sans-serif" font-size="10">${n.data.paper.year || ''} · ${n.data.paper.citationCount} cit.</text></g>`;
       })
       .join('');
 
-    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}"><rect width="100%" height="100%" fill="#000000"/>${edgeSvg}${nodeSvg}</svg>`;
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}"><rect width="100%" height="100%" fill="#FFFFFF"/>${edgeSvg}${nodeSvg}</svg>`;
     const blob = new Blob([svg], { type: 'image/svg+xml' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -136,11 +136,11 @@ export function KnowledgeGraph({ data, showMinimap, heatmapMode, onToggleMinimap
         maxZoom={3}
         proOptions={{ hideAttribution: true }}
       >
-        <Background color="#1F2937" gap={20} size={1} />
+        <Background color="#D1D5DB" gap={20} size={1} />
         {showMinimap ? (
           <MiniMap
-            style={{ background: '#0A0A0A', border: '2px solid #000000' }}
-            maskColor="rgba(0,0,0,0.6)"
+            style={{ background: '#FFFFFF', border: '2px solid #000000' }}
+            maskColor="rgba(0,0,0,0.1)"
             nodeColor={(n) => nodeColor((n.data as PaperNodeData) ?? ({} as PaperNodeData), heatmapMode, maxCitations)}
           />
         ) : null}
@@ -163,7 +163,7 @@ export function KnowledgeGraph({ data, showMinimap, heatmapMode, onToggleMinimap
         <ul className="space-y-1">
           {[
             { c: '#0066FF', l: 'Seed / Recent' },
-            { c: '#FFFFFF', l: 'Influential' },
+            { c: '#000000', l: 'Influential' },
             { c: '#94A3B8', l: 'Cited' },
           ].map((item) => (
             <li key={item.l} className="flex items-center gap-2">

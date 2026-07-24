@@ -20,19 +20,19 @@ export function PaperNode({ data, selected }: NodeProps<PaperNodeData>) {
           outline: selected ? `2px solid ${borderColor}` : undefined,
           outlineOffset: selected ? '2px' : undefined,
         }}
-        className="relative w-[180px] h-[70px] bg-surface-dark border border-white/15 border-l-4 px-3 py-2 cursor-pointer transition-all duration-150 hover:border-white/40"
+        className="relative w-[180px] h-[70px] bg-white border-2 border-black border-l-4 px-3 py-2 cursor-pointer transition-all duration-150 hover:shadow-impact"
       >
-        <p className="text-white text-[13px] font-sans leading-snug line-clamp-2 font-semibold">
+        <p className="text-black text-[13px] font-sans leading-snug line-clamp-2 font-semibold">
           {data.paper.title}
         </p>
         <div className="flex items-center gap-2 mt-1">
-          <span className="text-white/50 text-[11px] font-sans">{data.paper.year || '—'}</span>
-          <span className="text-white/30 text-[11px] font-sans">·</span>
-          <span className="text-white/50 text-[11px] font-sans">{data.paper.citationCount.toLocaleString()} cit.</span>
+          <span className="text-black/50 text-[11px] font-sans">{data.paper.year || '—'}</span>
+          <span className="text-black/30 text-[11px] font-sans">·</span>
+          <span className="text-black/50 text-[11px] font-sans">{data.paper.citationCount.toLocaleString()} cit.</span>
         </div>
         {data.isBookmarked ? (
           <div
-            className="absolute -top-1 -right-1 w-3 h-3 border-2 border-graph-bg"
+            className="absolute -top-1 -right-1 w-3 h-3 border-2 border-black"
             style={{ backgroundColor: borderColor }}
             aria-hidden
           />

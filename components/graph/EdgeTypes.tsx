@@ -22,11 +22,11 @@ function makeEdge(color: string, strokeDasharray?: string) {
   };
 }
 
-// Brand palette on the dark canvas: neutral light citation lines, accent-blue
+// Brand palette on the white canvas: neutral slate citation lines, accent-blue
 // semantic-similarity, muted co-author. No pastel/gold.
-export const CitationEdge = makeEdge('#CBD5E1');
+export const CitationEdge = makeEdge('#64748B');
 export const SemanticEdge = makeEdge('#0066FF', '6 3');
-export const CoAuthorEdge = makeEdge('#64748B', '2 2');
+export const CoAuthorEdge = makeEdge('#94A3B8', '2 2');
 
 export const edgeTypes = {
   citation: CitationEdge,

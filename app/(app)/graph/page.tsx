@@ -22,20 +22,20 @@ export default function GraphPage() {
       <div className="flex-1">
         {loading ? (
           <div className="flex items-center justify-center h-full bg-graph-bg">
-            <p className="text-white/50 font-sans font-black uppercase tracking-[0.2em] text-[10px] animate-pulse">
+            <p className="text-black/50 font-sans font-black uppercase tracking-[0.2em] text-[10px] animate-pulse">
               Constructing graph…
             </p>
           </div>
         ) : error ? (
           <div className="flex items-center justify-center h-full bg-graph-bg">
-            <p className="text-white/50 font-sans font-bold uppercase tracking-widest text-[10px]">{error}</p>
+            <p className="text-black/50 font-sans font-bold uppercase tracking-widest text-[10px]">{error}</p>
           </div>
         ) : isEmpty ? (
           <div className="flex items-center justify-center h-full bg-graph-bg">
             <div className="text-center max-w-sm px-6">
-              <Network size={48} strokeWidth={1} className="text-white/20 mx-auto mb-6" />
-              <p className="text-[10px] font-sans font-black uppercase tracking-[0.2em] text-white mb-2">Graph Is Empty</p>
-              <p className="text-xs font-sans text-white/40">
+              <Network size={48} strokeWidth={1} className="text-black/20 mx-auto mb-6" />
+              <p className="text-[10px] font-sans font-black uppercase tracking-[0.2em] text-black mb-2">Graph Is Empty</p>
+              <p className="text-xs font-sans text-black/40">
                 Save papers from Search to populate your knowledge graph.
               </p>
             </div>

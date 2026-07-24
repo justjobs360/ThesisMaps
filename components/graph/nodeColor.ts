@@ -2,7 +2,9 @@ import type { GraphNode, HeatmapMode } from '@/types/graph';
 
 const ACCENT = '#0066FF';
 const ACCENT_DIM = '#60A5FA';
-const WHITE = '#FFFFFF';
+// "Influential" reads as solid black on the white brutalist canvas (was #FFFFFF,
+// which is invisible now that nodes sit on white).
+const INK = '#000000';
 const SLATE = '#94A3B8';
 const SLATE_DARK = '#475569';
 
@@ -29,11 +31,11 @@ export function nodeColor(node: GraphNode, mode: HeatmapMode, maxCitations: numb
       return SLATE_DARK;
     }
     case 'relevance':
-      return node.type === 'seed' ? ACCENT : node.type === 'influential' ? WHITE : SLATE;
+      return node.type === 'seed' ? ACCENT : node.type === 'influential' ? INK : SLATE;
     case 'type':
     default:
       if (node.isBookmarked || node.type === 'seed') return ACCENT;
-      if (node.type === 'influential') return WHITE;
+      if (node.type === 'influential') return INK;
       if (node.type === 'citing') return ACCENT_DIM;
       return SLATE; // cited
   }

@@ -28,6 +28,9 @@ export default function TimelinePage() {
   const minYear = years.length ? Math.min(...years) : new Date().getFullYear() - 10;
   const maxYear = years.length ? Math.max(...years) : new Date().getFullYear();
   const range = Math.max(1, maxYear - minYear);
+  // Never render more axis ticks than there are distinct years in the range,
+  // otherwise Math.round collapses adjacent ticks into duplicate labels.
+  const tickCount = Math.min(8, range + 1);
   // A paper is "seminal" relative to this library: top citation count and >= 1000.
   const maxCitations = Math.max(0, ...papers.map((p) => p.citationCount));
   const seminalThreshold = Math.max(1000, maxCitations * 0.5);
@@ -56,10 +59,13 @@ export default function TimelinePage() {
         </div>
       ) : (
         <div className="bg-white border-2 border-black shadow-impact p-6 overflow-x-auto">
-          <div className="relative min-w-[600px]">
-            {/* X-axis years */}
+          <div className="relative min-w-[600px] px-10">
+            {/* X-axis years — one tick per distinct year step so short ranges
+                don't produce duplicate labels (e.g. 1996,1996,1997,1997…). */}
             <div className="flex justify-between text-[10px] font-sans font-black uppercase tracking-widest text-black mb-2">
-              {Array.from({ length: 8 }, (_, i) => minYear + Math.round((range / 7) * i)).map((y, i) => (
+              {Array.from({ length: tickCount }, (_, i) =>
+                minYear + Math.round((range / Math.max(1, tickCount - 1)) * i)
+              ).map((y, i) => (
                 <span key={`${y}-${i}`}>{y}</span>
               ))}
             </div>
@@ -70,8 +76,13 @@ export default function TimelinePage() {
             {/* Paper ticks */}
             <div className="relative h-24">
               {papers.map((paper) => {
-                const left = `${((paper.year - minYear) / range) * 100}%`;
+                const pct = ((paper.year - minYear) / range) * 100;
+                const left = `${pct}%`;
                 const isSeminal = paper.citationCount >= seminalThreshold;
+                // Keep the label inside the plot: left-align near the start,
+                // right-align near the end, centre everywhere in between.
+                const labelAlign =
+                  pct < 15 ? 'left-0 text-left' : pct > 85 ? 'right-0 text-right' : 'left-1/2 -translate-x-1/2 text-center';
                 return (
                   <div key={paper.id} className="absolute" style={{ left }}>
                     <div
@@ -85,7 +96,7 @@ export default function TimelinePage() {
                       aria-label={`${paper.title}, ${paper.year}, ${paper.citationCount.toLocaleString()} citations`}
                     />
                     {isSeminal ? (
-                      <p className="absolute top-5 left-1/2 -translate-x-1/2 text-[10px] font-sans font-black uppercase tracking-tight text-accent whitespace-nowrap max-w-[120px] truncate text-center">
+                      <p className={`absolute top-5 ${labelAlign} text-[10px] font-sans font-black uppercase tracking-tight text-accent whitespace-nowrap max-w-[120px] truncate`}>
                         {paper.title.split(' ').slice(0, 4).join(' ')}
                       </p>
                     ) : null}
