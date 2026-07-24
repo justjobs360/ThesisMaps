@@ -64,7 +64,7 @@ export function normaliseOpenAlex(raw: Record<string, unknown>): Paper {
     openAccess: Boolean(oa?.is_oa),
     fieldsOfStudy: concepts,
     source: 'openalex',
-    url: raw.landing_page_url ? String(raw.landing_page_url) : undefined,
+    url: (raw.primary_location as { landing_page_url?: string } | undefined)?.landing_page_url,
   };
 }
 

@@ -22,16 +22,16 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
 
   const parsed = querySchema.safeParse({
-    q: searchParams.get('q'),
-    page: searchParams.get('page'),
-    pageSize: searchParams.get('pageSize'),
+    q: searchParams.get('q') ?? undefined,
+    page: searchParams.get('page') ?? undefined,
+    pageSize: searchParams.get('pageSize') ?? undefined,
   });
 
   if (!parsed.success) {
     return NextResponse.json({ error: 'Invalid query parameters', details: parsed.error.flatten() }, { status: 400 });
   }
 
-  const { q, page, pageSize } = parsed.data;
+  const { q, page } = parsed.data;
   const ck = cacheKey('search', q, String(page));
 
   try {
@@ -56,6 +56,13 @@ export async function GET(request: Request) {
       searchEuropePmc(q, 10),
       searchDoaj(q, 10),
     ]);
+
+    const sourceLabels = ['s2', 'openalex', 'arxiv', 'crossref', 'pubmed', 'core', 'europePmc', 'doaj'];
+    [s2, oa, arxiv, cr, pubmed, core, europePmc, doaj].forEach((r, i) => {
+      if (r.status === 'rejected') {
+        console.warn(`[papers/search] source "${sourceLabels[i]}" failed:`, r.reason?.message ?? r.reason);
+      }
+    });
 
     const all: Paper[] = [
       ...(s2.status === 'fulfilled' ? s2.value : []),

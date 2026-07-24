@@ -9,7 +9,7 @@ export async function searchOpenAlex(query: string, limit = 20): Promise<Paper[]
     params: {
       search: query,
       'per-page': limit,
-      select: 'id,title,abstract_inverted_index,authorships,publication_year,cited_by_count,open_access,concepts,ids,landing_page_url',
+      select: 'id,title,abstract_inverted_index,authorships,publication_year,cited_by_count,open_access,concepts,ids,primary_location',
     },
     headers: { 'User-Agent': 'ThesisMaps/1.0 (mailto:contact@thesismaps.com)' },
     timeout: 10_000,

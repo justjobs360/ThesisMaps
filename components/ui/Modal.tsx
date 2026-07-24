@@ -29,18 +29,19 @@ export function Modal({ open, onClose, title, description, children, maxWidth = 
                 className="fixed inset-0 z-50 bg-black/40"
               />
             </Dialog.Overlay>
-            <Dialog.Content asChild>
-              <motion.div
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: 8 }}
-                transition={{ duration: 0.2, ease: 'easeOut' }}
-                className={[
-                  'fixed left-1/2 top-1/2 z-50 w-full -translate-x-1/2 -translate-y-1/2',
-                  'bg-white border-2 border-black shadow-impact p-6',
-                  maxWidth,
-                ].join(' ')}
-              >
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
+              <Dialog.Content asChild>
+                <motion.div
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: 8 }}
+                  transition={{ duration: 0.2, ease: 'easeOut' }}
+                  className={[
+                    'pointer-events-auto w-full',
+                    'bg-white border-2 border-black shadow-impact p-6',
+                    maxWidth,
+                  ].join(' ')}
+                >
                 <div className="flex items-start justify-between mb-4 pb-4 border-b-2 border-black">
                   <div>
                     <Dialog.Title className="font-serif text-2xl font-black uppercase tracking-tight text-black">
@@ -59,8 +60,9 @@ export function Modal({ open, onClose, title, description, children, maxWidth = 
                   </Dialog.Close>
                 </div>
                 {children}
-              </motion.div>
-            </Dialog.Content>
+                </motion.div>
+              </Dialog.Content>
+            </div>
           </Dialog.Portal>
         ) : null}
       </AnimatePresence>

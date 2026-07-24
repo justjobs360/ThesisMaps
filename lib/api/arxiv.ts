@@ -26,7 +26,8 @@ function parseAtomEntries(xml: string): Record<string, unknown>[] {
 export async function searchArxiv(query: string, limit = 20): Promise<Paper[]> {
   const { data } = await axios.get(BASE, {
     params: { search_query: `all:${query}`, max_results: limit, sortBy: 'relevance' },
-    timeout: 15_000,
+    headers: { 'User-Agent': 'ThesisMaps/1.0 (mailto:contact@thesismaps.com)' },
+    timeout: 10_000,
   });
 
   const entries = parseAtomEntries(String(data));
