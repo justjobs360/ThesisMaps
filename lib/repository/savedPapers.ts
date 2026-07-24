@@ -91,6 +91,26 @@ export async function savePaper(
   return rowToSavedPaper(data as SavedRow);
 }
 
+/** Updates a saved paper's read status / tags / notes, scoped to the owner. */
+export async function updateSavedPaper(
+  userId: string,
+  savedId: string,
+  patch: { readStatus?: 'unread' | 'reading' | 'read'; tags?: string[]; notes?: string }
+): Promise<void> {
+  const update: Record<string, unknown> = {};
+  if (patch.readStatus !== undefined) update.read_status = patch.readStatus;
+  if (patch.tags !== undefined) update.tags = patch.tags;
+  if (patch.notes !== undefined) update.notes = patch.notes;
+
+  const { error } = await supabaseAdmin
+    .from('saved_papers')
+    .update(update)
+    .eq('id', savedId)
+    .eq('user_id', userId);
+
+  if (error) throw new Error(`updateSavedPaper failed: ${error.message}`);
+}
+
 /** Removes a saved paper by its saved_papers row id, scoped to the owner. */
 export async function removeSavedPaper(userId: string, savedId: string): Promise<void> {
   const { error } = await supabaseAdmin

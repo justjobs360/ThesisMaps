@@ -9,6 +9,7 @@ import type { FeedbackItem } from '@/types/admin';
 
 type FeedbackListProps = {
   items: FeedbackItem[];
+  onUpdateStatus?: (id: string, status: FeedbackItem['status']) => void;
 };
 
 const TYPE_VARIANT: Record<string, 'accent' | 'danger' | 'muted'> = {
@@ -18,7 +19,7 @@ const TYPE_VARIANT: Record<string, 'accent' | 'danger' | 'muted'> = {
   content: 'muted',
 };
 
-export function FeedbackList({ items }: FeedbackListProps) {
+export function FeedbackList({ items, onUpdateStatus }: FeedbackListProps) {
   const [selected, setSelected] = useState<FeedbackItem | null>(null);
 
   return (
@@ -64,7 +65,18 @@ export function FeedbackList({ items }: FeedbackListProps) {
             </p>
             <div className="flex gap-2 justify-end">
               <Button size="sm" variant="secondary" onClick={() => setSelected(null)}>Close</Button>
-              <Button size="sm" variant="primary">Mark Resolved</Button>
+              {selected.status !== 'resolved' ? (
+                <Button
+                  size="sm"
+                  variant="primary"
+                  onClick={() => {
+                    onUpdateStatus?.(selected.id, 'resolved');
+                    setSelected(null);
+                  }}
+                >
+                  Mark Resolved
+                </Button>
+              ) : null}
             </div>
           </div>
         </Modal>

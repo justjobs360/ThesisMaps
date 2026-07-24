@@ -1,50 +1,92 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Modal } from '@/components/ui/Modal';
 import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
-import { UserPlus, Clock } from 'lucide-react';
+import { Skeleton } from '@/components/ui/Skeleton';
+import { UserPlus, Clock, X } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
+import { useProject } from '@/hooks/useProject';
+import { apiClient, ApiError } from '@/lib/apiClient';
+import type { Comment } from '@/types/thesis';
+import type { CollaborationMember } from '@/lib/repository/collaborations';
 
-type Member = { id: string; name: string; email: string; role: 'Editor' | 'Viewer'; initials: string };
-
-const INITIAL_MEMBERS: Member[] = [
-  { id: 'm1', name: 'Dr. Sarah Khan', email: 'skhan@oxford.ac.uk', role: 'Editor', initials: 'SK' },
-  { id: 'm2', name: 'Prof. James Wright', email: 'j.wright@cam.ac.uk', role: 'Viewer', initials: 'JW' },
-];
-
-const ACTIVITY = [
-  { id: 'a1', user: 'Sarah Khan', action: 'added 3 papers to Literature Review', time: '2024-07-20T14:00:00Z' },
-  { id: 'a2', user: 'Prof. Wright', action: 'commented on Attention Is All You Need', time: '2024-07-19T11:30:00Z' },
-  { id: 'a3', user: 'You', action: 'created a new outline section: Methodology', time: '2024-07-18T09:00:00Z' },
-];
-
-function initialsFor(email: string): string {
-  const name = email.split('@')[0] ?? '';
-  return name.slice(0, 2).toUpperCase() || '??';
+function initialsFor(nameOrEmail: string): string {
+  const parts = nameOrEmail.split(/[\s@._-]+/).filter(Boolean);
+  const first = parts[0]?.[0] ?? '?';
+  const second = parts[1]?.[0] ?? '';
+  return (first + second).toUpperCase();
 }
 
 export default function CollaboratePage() {
-  const [members, setMembers] = useState<Member[]>(INITIAL_MEMBERS);
+  const { projectId } = useProject();
+  const [members, setMembers] = useState<CollaborationMember[]>([]);
+  const [comments, setComments] = useState<Comment[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
   const [open, setOpen] = useState(false);
   const [email, setEmail] = useState('');
-  const [role, setRole] = useState('Viewer');
+  const [role, setRole] = useState('viewer');
+  const [inviting, setInviting] = useState(false);
+  const [inviteError, setInviteError] = useState<string | null>(null);
 
-  function handleInvite(e: React.FormEvent) {
+  const refresh = useCallback(async () => {
+    if (!projectId) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const [{ members: m }, { comments: c }] = await Promise.all([
+        apiClient.get<{ members: CollaborationMember[] }>(`/api/collaborations?projectId=${projectId}`),
+        apiClient.get<{ comments: Comment[] }>(`/api/comments?projectId=${projectId}`),
+      ]);
+      setMembers(m);
+      setComments(c);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load collaboration data');
+    } finally {
+      setLoading(false);
+    }
+  }, [projectId]);
+
+  useEffect(() => {
+    void refresh();
+  }, [refresh]);
+
+  async function handleInvite(e: React.FormEvent) {
     e.preventDefault();
-    if (!email.trim()) return;
-    // Local-only for now — collaboration persistence is not yet wired to the backend.
-    setMembers((prev) => [
-      ...prev,
-      { id: `m${Date.now()}`, name: email.split('@')[0] ?? email, email: email.trim(), role: role as Member['role'], initials: initialsFor(email) },
-    ]);
-    setEmail('');
-    setRole('Viewer');
-    setOpen(false);
+    if (!email.trim() || !projectId || inviting) return;
+    setInviting(true);
+    setInviteError(null);
+    try {
+      const { member } = await apiClient.post<{ member: CollaborationMember }>('/api/collaborations', {
+        projectId,
+        email: email.trim(),
+        role,
+      });
+      setMembers((prev) => [...prev.filter((m) => m.id !== member.id), member]);
+      setEmail('');
+      setRole('viewer');
+      setOpen(false);
+    } catch (err) {
+      setInviteError(err instanceof ApiError ? err.message : 'Invite failed. Try again.');
+    } finally {
+      setInviting(false);
+    }
+  }
+
+  async function handleRemove(collaborationId: string) {
+    if (!projectId) return;
+    setMembers((prev) => prev.filter((m) => m.id !== collaborationId));
+    try {
+      await apiClient.del('/api/collaborations', { projectId, collaborationId });
+    } catch {
+      void refresh();
+    }
   }
 
   return (
@@ -59,51 +101,89 @@ export default function CollaboratePage() {
         }
       />
 
+      {error ? (
+        <div className="border-2 border-black bg-white p-5">
+          <p className="text-[10px] text-red-600 font-black uppercase tracking-widest">Failed to load</p>
+          <p className="text-xs text-black/40 font-sans mt-1">{error}</p>
+        </div>
+      ) : null}
+
       <div className="grid md:grid-cols-2 gap-6">
         {/* Members */}
         <section aria-labelledby="members-heading" className="bg-white border-2 border-black shadow-impact p-5">
           <h2 id="members-heading" className="font-serif text-lg font-black uppercase tracking-tight text-black mb-4 pb-2 border-b-2 border-black">
             Members
           </h2>
-          <ul className="space-y-3">
-            {members.map((member) => (
-              <li key={member.id} className="flex items-center justify-between gap-3">
-                <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 border-2 border-black bg-white flex items-center justify-center text-[11px] font-black text-black font-sans">
-                    {member.initials}
+          {loading ? (
+            <div className="space-y-3">
+              {Array.from({ length: 2 }).map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}
+            </div>
+          ) : members.length === 0 ? (
+            <p className="text-[10px] text-black/40 font-bold uppercase tracking-widest py-6 text-center border-2 border-dashed border-black">
+              No collaborators yet — invite one above.
+            </p>
+          ) : (
+            <ul className="space-y-3">
+              {members.map((member) => (
+                <li key={member.id} className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-9 h-9 border-2 border-black bg-white flex items-center justify-center text-[11px] font-black text-black font-sans flex-shrink-0">
+                      {initialsFor(member.name || member.email)}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-[12px] font-sans font-black uppercase tracking-tight text-black truncate">{member.name}</p>
+                      <p className="text-[10px] text-black/50 font-sans truncate">{member.email}</p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-[12px] font-sans font-black uppercase tracking-tight text-black">{member.name}</p>
-                    <p className="text-[10px] text-black/50 font-sans">{member.email}</p>
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <Badge variant={member.role === 'editor' ? 'accent' : 'muted'}>
+                      {member.role === 'editor' ? 'Editor' : 'Viewer'}
+                    </Badge>
+                    <button
+                      onClick={() => void handleRemove(member.id)}
+                      aria-label={`Remove ${member.name}`}
+                      className="text-black/30 hover:text-red-600 transition-colors"
+                    >
+                      <X size={14} strokeWidth={3} />
+                    </button>
                   </div>
-                </div>
-                <Badge variant={member.role === 'Editor' ? 'accent' : 'muted'}>{member.role}</Badge>
-              </li>
-            ))}
-          </ul>
+                </li>
+              ))}
+            </ul>
+          )}
         </section>
 
-        {/* Activity */}
+        {/* Activity — real comment stream */}
         <section aria-labelledby="activity-heading" className="bg-white border-2 border-black shadow-impact p-5">
           <h2 id="activity-heading" className="font-serif text-lg font-black uppercase tracking-tight text-black mb-4 pb-2 border-b-2 border-black">
             Recent Activity
           </h2>
-          <ol className="space-y-3">
-            {ACTIVITY.map((item) => (
-              <li key={item.id} className="flex items-start gap-3">
-                <Clock size={14} strokeWidth={2} className="text-black mt-0.5 flex-shrink-0" aria-hidden />
-                <div>
-                  <p className="text-[12px] font-sans text-black">
-                    <span className="font-black uppercase tracking-tight">{item.user}</span>{' '}
-                    <span className="text-black/60">{item.action}</span>
-                  </p>
-                  <p className="text-[10px] text-black/40 font-sans mt-0.5">
-                    {formatDistanceToNow(new Date(item.time), { addSuffix: true })}
-                  </p>
-                </div>
-              </li>
-            ))}
-          </ol>
+          {loading ? (
+            <div className="space-y-3">
+              {Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-8 w-full" />)}
+            </div>
+          ) : comments.length === 0 ? (
+            <p className="text-[10px] text-black/40 font-bold uppercase tracking-widest py-6 text-center border-2 border-dashed border-black">
+              No activity yet — comments on papers will appear here.
+            </p>
+          ) : (
+            <ol className="space-y-3">
+              {comments.slice(0, 10).map((item) => (
+                <li key={item.id} className="flex items-start gap-3">
+                  <Clock size={14} strokeWidth={2} className="text-black mt-0.5 flex-shrink-0" aria-hidden />
+                  <div className="min-w-0">
+                    <p className="text-[12px] font-sans text-black">
+                      <span className="font-black uppercase tracking-tight">{item.user?.name ?? 'Someone'}</span>{' '}
+                      <span className="text-black/60">commented: “{item.content.length > 80 ? `${item.content.slice(0, 80)}…` : item.content}”</span>
+                    </p>
+                    <p className="text-[10px] text-black/40 font-sans mt-0.5">
+                      {formatDistanceToNow(new Date(item.createdAt), { addSuffix: true })}
+                    </p>
+                  </div>
+                </li>
+              ))}
+            </ol>
+          )}
         </section>
       </div>
 
@@ -122,11 +202,14 @@ export default function CollaboratePage() {
             value={role}
             onValueChange={setRole}
             options={[
-              { value: 'Viewer', label: 'Viewer' },
-              { value: 'Editor', label: 'Editor' },
+              { value: 'viewer', label: 'Viewer' },
+              { value: 'editor', label: 'Editor' },
             ]}
           />
-          <Button type="submit" variant="primary" className="w-full">
+          {inviteError ? (
+            <p className="text-[10px] text-red-600 font-black uppercase tracking-widest">{inviteError}</p>
+          ) : null}
+          <Button type="submit" variant="primary" className="w-full" loading={inviting}>
             Send Invite
           </Button>
         </form>

@@ -1,6 +1,6 @@
 # ThesisMaps — Implementation Checklist & Plan
 
-_Last updated: 2026-07-16_
+_Last updated: 2026-07-18_
 
 This document tracks what was built in the "make half the backend real + unify feature-page
 design" pass, what you must do to switch it on, and exactly how the remaining half will be built
@@ -108,63 +108,99 @@ Everything below is **not required** to turn the backend on — skip unless you 
       update (green/amber/red).
 - [ ] Graph: renders nodes from the saved set; **Color by …** recolors; minimap toggles; **Export**
       downloads an SVG.
+- [ ] Dashboard stats show your real counts; Research Debt lists unread saves; **Review** persists.
+- [ ] Seeds: create a set from library picks → persists; delete works.
+- [ ] Gaps: **Analyze my library** returns clusters from your actual saved papers.
+- [ ] Timeline plots your library; **Export** downloads BibTeX/CSV/JSON of your real papers.
+- [ ] Outline **Export** downloads a real DOCX/PDF of your outline with citations.
+- [ ] Collaborate: inviting an email that has an account adds them; unknown email → clear error.
+- [ ] Settings: thesis metadata save persists (title changes on dashboard after save).
+- [ ] Admin (after setting your role to admin): /admin loads with real stats; non-admins get
+      bounced to /dashboard.
 
 ---
 
-## 4. Remaining work — the "other half" (not yet real)
+## 4. The "other half" — ✅ ALL BUILT (2026-07-18 pass)
 
-These still render `lib/mockData.ts`. Each item below says **how** to build it and **which existing
-pattern/format to follow** so it stays consistent.
+Everything below is now real (no `MOCK_*` on any user-facing surface):
 
-### 4.1 Admin panel → wire to the (already real) admin APIs
-- **State:** `app/api/admin/*` routes are real Supabase queries; the admin **UI** still imports
-  `MOCK_*` and is **not gated**.
-- **How:**
-  1. Add role gating: create an `AdminGuard` mirroring `components/auth/AuthGuard.tsx` that also
-     checks `users.role === 'admin'`; use it in `app/(admin)/layout.tsx`.
-  2. Replace `MOCK_*` imports in `app/(admin)/**` with `apiClient.get(...)` calls to the existing
-     routes (`/api/admin/stats`, `/api/admin/users`, `/api/admin/feedback`, `/api/admin/flags`,
-     `/api/admin/papers`).
-  3. Finish `app/api/admin/stats/route.ts`: replace the 3 hardcoded fields
-     (`activeUsersLast7d`, `totalPapersSaved`, `totalSearchesLast30d`) with real counts from
-     `analytics_events` / `saved_papers`.
-- **Format:** admin surface uses `admin-bg` tokens; keep `DataTable` (now branded) for tables.
+### 4.1 Admin panel — ✅ Done
+- `AdminGuard` (`components/auth/AdminGuard.tsx`) gates `app/(admin)/layout.tsx` via new
+  `GET /api/me` (role check); non-admins → `/dashboard`, signed-out → `/login`.
+- All admin pages are client components on real APIs: overview (stats + real
+  `admin_activity_log` feed), users (list + suspend/delete), user detail (suspend/promote/
+  delete), projects (new `GET /api/admin/projects` with owner + paper/collaborator counts),
+  papers, feedback (status updates persist), flags (dismiss/action persist).
+- `admin/stats` now returns ALL real counts (active users 7d via `last_active_at`, papers
+  saved, searches 30d via `analytics_events`) + `recentActivity`.
+- New: `GET/PATCH /api/admin/settings` (feature flags + banner over `platform_settings`),
+  `GET /api/admin/health` (live pings of S2/OpenAlex/arXiv/CrossRef/ML/Redis),
+  `DELETE /api/admin/cache` (Redis flush). Admin settings page fully wired.
+- Snake→camel mapping centralised in `lib/adminMappers.ts`.
+- **To make yourself admin:** in Supabase SQL editor run
+  `update users set role = 'admin' where email = 'you@example.com';`
 
-### 4.2 Seed sets → real persistence
-- **How:** new `app/api/seeds/route.ts` (GET/POST/DELETE) + `lib/repository/seeds.ts` over the
-  `seed_sets` table (already in schema). Wire `app/(app)/seeds/page.tsx` (currently static) via a
-  `useSeeds(projectId)` hook.
-- **Format:** copy the route shape from `app/api/outline/route.ts` and the repository shape from
-  `lib/repository/outline.ts`. The seeds page is already on-brand — only data wiring is needed.
+### 4.2 Seed sets — ✅ Done
+- `lib/repository/seeds.ts` + `app/api/seeds/route.ts` (GET/POST/PATCH/DELETE) + `hooks/useSeeds.ts`.
+- Seeds page: create set from saved library (picker modal), select/delete sets, view resolved papers.
 
-### 4.3 Collaboration & comments → real persistence
-- **How:** `app/api/collaborations/route.ts` (+ invite) and `app/api/comments/route.ts` over the
-  `collaborations` / `comments` tables. Replace the local-only invite in
-  `app/(app)/collaborate/page.tsx` with `apiClient.post`.
-- **Format:** same route/repository pattern; reuse the branded `Modal` already in place.
+### 4.3 Collaboration & comments — ✅ Done
+- `lib/repository/collaborations.ts` + `comments.ts`; `app/api/collaborations` +
+  `app/api/comments` routes. Invite looks up an existing user by email (404 with clear message
+  if they haven't signed up — no email-sending infra yet). Activity feed shows real comments.
 
-### 4.4 Research gaps → stand up the ML service
-- **State:** `app/api/gaps/route.ts` proxies to `ML_SERVICE_URL` if set, else returns mock.
-- **How:** deploy the Python FastAPI microservice (embeddings/clustering) and set `ML_SERVICE_URL`,
-  **or** implement in-DB clustering over `papers.embedding` (pgvector). Populate embeddings on
-  `upsertPaper` (call the ML embed endpoint). Wire `gaps/page.tsx` `runAnalysis` to POST real work.
-- **Format:** the gaps page is already on-brand; only the analysis call is fake.
+### 4.4 Research gaps — ✅ Done (built-in engine)
+- `lib/gapAnalysis.ts`: deterministic clustering by field-of-study with gap scores
+  (sparsity + staleness), keyword extraction, and future-work phrase detection over abstracts.
+- `/api/gaps` is now authed + ownership-checked; still proxies to `ML_SERVICE_URL` when set.
+- Gaps page calls the real API, tracks `gap_analysis_run`, and has empty/error states.
 
-### 4.5 Export → use real data
-- **State:** `app/api/export/route.ts` formatting (BibTeX/CSV/JSON) is real but always exports
-  `MOCK_PAPERS`.
-- **How:** use the request's `projectId`/`paperIds` to fetch from `listSavedPapers` /
-  `listSectionPapers` instead of `MOCK_PAPERS`. Add DOCX (via `docx`) and PDF (via `jspdf`) outputs
-  for the outline. Wire the (currently removed) export buttons on outline/timeline.
+### 4.5 Export — ✅ Done
+- `/api/export` uses the real library (`bibtex`/`csv`/`json`, optional `paperIds` subset) and
+  real outline for `docx` (via `docx`) and `pdf` (via `jspdf`) with citations per section.
+- `components/ExportMenu.tsx` + `lib/download.ts` (authed blob download). Wired on
+  outline (DOCX/PDF) and timeline (BibTeX/CSV/JSON).
 
-### 4.6 Timeline / defence → optionally read real data
-- **How:** both are on-brand but read `MOCK_PAPERS`. Convert to client components using
-  `useProject` + `apiClient.get('/api/papers/save?projectId=…')` to plot the real library. Defence
-  panels can filter the library by simple heuristics until the ML service classifies them.
+### 4.6 Timeline / defence — ✅ Done
+- Both are client components over the real library. Timeline scales its axis to your library's
+  year range; "seminal" = top-cited relative to the library. Defence panels classify library
+  papers via keyword heuristics (counter-arguments / contradictions / methodology critiques)
+  until an ML service exists.
 
-### 4.7 Middleware hardening (optional)
-- `middleware.ts` is a presence-only gate (real enforcement is in the route guards). If you want
-  edge-level verification, move to a session-cookie approach verified via a lightweight token check.
+### 4.7 Also wired this pass (frontend↔backend integration)
+- **Dashboard:** real stats (papers/chapters/high-gap clusters/seed sets), Research Debt panel
+  lists real unread saved papers ("Review" opens the paper and persists `read_status`),
+  methodological fingerprint computed from the library.
+- **Settings:** profile save (Firebase `updateProfile`), thesis metadata save
+  (`PATCH /api/projects/[id]`), password change (Firebase `updatePassword`), account deletion
+  (`DELETE /api/me` — removes Firebase user + all rows via cascade). The cosmetic
+  notifications section was removed (no backing table in the schema).
+- **Saved papers:** `PATCH /api/papers/save` for readStatus/tags/notes.
+- **Search:** tracks `search_run` events (feeds the admin "Searches (30d)" stat); "My Library"
+  scope uses indexed full-text search (see §6).
+- Fixed: admin user PATCH wrote camelCase `adminNotes` to a snake_case column (silently dropped).
+
+### 4.9 Search now queries all 8 sources (file.txt spec compliance)
+- **Was:** `/api/papers/search` only called Semantic Scholar, OpenAlex, arXiv, CrossRef —
+  `lib/api/pubmed.ts`, `core.ts`, `europePmc.ts`, `doaj.ts` existed but were never imported
+  anywhere (dead code), despite the landing page and file.txt spec both promising 8 sources.
+- **Now:** all 8 are queried in parallel (`Promise.allSettled`, so one slow/failing source never
+  blocks the rest) and deduped by DOI/arXiv id, matching file.txt's "API Sources" section.
+- **Bug fixed in the process:** `searchPubMed` requested `retmode=json` from NCBI's `efetch`
+  endpoint, which — despite the parameter — always returns XML for full records. The old code
+  silently got `[]` back every time (never threw, never logged) — a real "feature that looked
+  wired but did nothing." Rewired to fetch XML and parse it (regex-based, same style as the
+  existing `arxiv.ts` parser); verified live against NCBI (returns real titles/abstracts/authors).
+
+### 4.8 Still optional / not built (needs infra or product decisions)
+- Python ML microservice (SPECTER embeddings, semantic similarity, draft generation) — the
+  built-in gap engine covers the feature until then; set `ML_SERVICE_URL` to upgrade.
+- Email delivery for collaborator invites (needs an email provider).
+- Saved searches (`saved_searches` table exists; no UI/route yet).
+- Notification preferences (no table in schema).
+- Middleware hardening (edge-level token verification) — route guards remain the enforcement.
+- Admin analytics page with date-range charts (overview charts still illustrative mock data —
+  real aggregation queries over `analytics_events` are a follow-up).
 
 ---
 

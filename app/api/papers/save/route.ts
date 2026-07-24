@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { requireUser } from '@/lib/admin-guard';
 import { ensureUser } from '@/lib/repository/users';
 import { getProject } from '@/lib/repository/projects';
-import { listSavedPapers, searchSavedPapers, savePaper, removeSavedPaper } from '@/lib/repository/savedPapers';
+import { listSavedPapers, searchSavedPapers, savePaper, updateSavedPaper, removeSavedPaper } from '@/lib/repository/savedPapers';
 import { handleRouteError } from '@/lib/route-helpers';
 
 const paperSchema = z.object({
@@ -72,6 +72,30 @@ export async function POST(request: Request) {
     return NextResponse.json({ saved }, { status: 201 });
   } catch (err) {
     return handleRouteError(err, 'papers/save/POST');
+  }
+}
+
+const updateSchema = z.object({
+  savedId: z.string().uuid(),
+  readStatus: z.enum(['unread', 'reading', 'read']).optional(),
+  tags: z.array(z.string()).optional(),
+  notes: z.string().max(4000).optional(),
+});
+
+// PATCH /api/papers/save — update read status / tags / notes on a saved paper
+export async function PATCH(request: Request) {
+  try {
+    const decoded = await requireUser(request);
+    await ensureUser(decoded);
+    const body = updateSchema.parse(await request.json());
+    await updateSavedPaper(decoded.uid, body.savedId, {
+      readStatus: body.readStatus,
+      tags: body.tags,
+      notes: body.notes,
+    });
+    return NextResponse.json({ ok: true });
+  } catch (err) {
+    return handleRouteError(err, 'papers/save/PATCH');
   }
 }
 

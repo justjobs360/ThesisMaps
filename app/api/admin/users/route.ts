@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/admin-guard';
 import { supabaseAdmin } from '@/lib/supabase-server';
-import { z } from 'zod';
+import { handleRouteError } from '@/lib/route-helpers';
+import { rowToAdminUser, type AdminUserRow } from '@/lib/adminMappers';
 
 export async function GET(request: Request) {
   try {
@@ -15,7 +16,7 @@ export async function GET(request: Request) {
 
     let query = supabaseAdmin
       .from('users')
-      .select('*', { count: 'exact' })
+      .select('*, thesis_projects(count)', { count: 'exact' })
       .order('created_at', { ascending: false })
       .range((page - 1) * pageSize, page * pageSize - 1);
 
@@ -25,12 +26,9 @@ export async function GET(request: Request) {
     const { data, error, count } = await query;
     if (error) throw error;
 
-    return NextResponse.json({ users: data, total: count, page, pageSize });
+    const users = (data as unknown as AdminUserRow[]).map(rowToAdminUser);
+    return NextResponse.json({ users, total: count, page, pageSize });
   } catch (err) {
-    const msg = err instanceof Error ? err.message : 'Unknown error';
-    if (msg.includes('Unauthorized') || msg.includes('Forbidden')) {
-      return NextResponse.json({ error: msg }, { status: 403 });
-    }
-    return NextResponse.json({ error: 'Failed to fetch users' }, { status: 500 });
+    return handleRouteError(err, 'admin/users/GET');
   }
 }

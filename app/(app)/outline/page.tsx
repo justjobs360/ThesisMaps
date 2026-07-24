@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { OutlineBuilder } from '@/components/outline/OutlineBuilder';
+import { ExportMenu } from '@/components/ExportMenu';
 
 export const metadata: Metadata = {
   title: 'Outline Builder',
@@ -14,6 +15,7 @@ export default function OutlinePage() {
         <PageHeader
           title="Outline Builder"
           subtitle="Structure your thesis chapters and track literature coverage per section."
+          action={<ExportMenu formats={['docx', 'pdf']} />}
         />
       </div>
       <div className="flex-1 p-6 md:p-12 overflow-hidden">

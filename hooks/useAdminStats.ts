@@ -1,31 +1,45 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import type { AdminStats } from '@/types/admin';
-import { MOCK_ADMIN_STATS } from '@/lib/mockData';
+import { apiClient } from '@/lib/apiClient';
+import type { AdminStats, AdminActivityLog } from '@/types/admin';
+
+const EMPTY_STATS: AdminStats = {
+  totalUsers: 0,
+  newUsersLast30d: 0,
+  activeUsersLast7d: 0,
+  totalProjects: 0,
+  totalPapersSaved: 0,
+  totalSearchesLast30d: 0,
+  openFeedbackTickets: 0,
+  pendingFlags: 0,
+};
 
 export function useAdminStats() {
-  const [stats, setStats] = useState<AdminStats>(MOCK_ADMIN_STATS);
-  const [loading, setLoading] = useState(false);
+  const [stats, setStats] = useState<AdminStats>(EMPTY_STATS);
+  const [activity, setActivity] = useState<AdminActivityLog[]>([]);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    async function fetchStats() {
-      setLoading(true);
-      try {
-        const res = await fetch('/api/admin/stats');
-        if (!res.ok) throw new Error('Failed to load stats');
-        const data = (await res.json()) as AdminStats;
+    let cancelled = false;
+    apiClient
+      .get<AdminStats & { recentActivity?: AdminActivityLog[] }>('/api/admin/stats')
+      .then((data) => {
+        if (cancelled) return;
         setStats(data);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Unknown error');
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    void fetchStats();
+        setActivity(data.recentActivity ?? []);
+      })
+      .catch((err) => {
+        if (!cancelled) setError(err instanceof Error ? err.message : 'Unknown error');
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
-  return { stats, loading, error };
+  return { stats, activity, loading, error };
 }

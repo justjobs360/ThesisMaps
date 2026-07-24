@@ -5,6 +5,10 @@ import { searchSemanticScholar } from '@/lib/api/semanticScholar';
 import { searchOpenAlex } from '@/lib/api/openAlex';
 import { searchArxiv } from '@/lib/api/arxiv';
 import { searchCrossRef } from '@/lib/api/crossref';
+import { searchPubMed } from '@/lib/api/pubmed';
+import { searchCore } from '@/lib/api/core';
+import { searchEuropePmc } from '@/lib/api/europePmc';
+import { searchDoaj } from '@/lib/api/doaj';
 import { deduplicatePapers } from '@/lib/normalise';
 import type { Paper } from '@/types/paper';
 
@@ -40,11 +44,17 @@ export async function GET(request: Request) {
   }
 
   try {
-    const [s2, oa, arxiv, cr] = await Promise.allSettled([
+    // Query all 8 sources in parallel; a slow/failed source never blocks the others
+    // (Promise.allSettled), and results are deduped by DOI/arXiv id below.
+    const [s2, oa, arxiv, cr, pubmed, core, europePmc, doaj] = await Promise.allSettled([
       searchSemanticScholar(q, 15),
       searchOpenAlex(q, 10),
       searchArxiv(q, 10),
       searchCrossRef(q, 10),
+      searchPubMed(q, 10),
+      searchCore(q, 10),
+      searchEuropePmc(q, 10),
+      searchDoaj(q, 10),
     ]);
 
     const all: Paper[] = [
@@ -52,6 +62,10 @@ export async function GET(request: Request) {
       ...(oa.status === 'fulfilled' ? oa.value : []),
       ...(arxiv.status === 'fulfilled' ? arxiv.value : []),
       ...(cr.status === 'fulfilled' ? cr.value : []),
+      ...(pubmed.status === 'fulfilled' ? pubmed.value : []),
+      ...(core.status === 'fulfilled' ? core.value : []),
+      ...(europePmc.status === 'fulfilled' ? europePmc.value : []),
+      ...(doaj.status === 'fulfilled' ? doaj.value : []),
     ];
 
     const papers = deduplicatePapers(all);

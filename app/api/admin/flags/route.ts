@@ -2,16 +2,17 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { requireAdmin } from '@/lib/admin-guard';
 import { supabaseAdmin } from '@/lib/supabase-server';
+import { rowToFlagItem, type FlagRow } from '@/lib/adminMappers';
 
 export async function GET(request: Request) {
   try {
     await requireAdmin(request);
     const { data, error } = await supabaseAdmin
       .from('flags')
-      .select('*')
+      .select('*, users:flagged_by(email)')
       .order('created_at', { ascending: false });
     if (error) throw error;
-    return NextResponse.json({ items: data });
+    return NextResponse.json({ items: (data as unknown as FlagRow[]).map(rowToFlagItem) });
   } catch {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }

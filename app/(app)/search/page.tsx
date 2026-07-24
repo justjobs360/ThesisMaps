@@ -9,6 +9,7 @@ import { SkeletonCard } from '@/components/ui/Skeleton';
 import { Badge } from '@/components/ui/Badge';
 import { X } from 'lucide-react';
 import { useProject } from '@/hooks/useProject';
+import { useAnalytics } from '@/hooks/useAnalytics';
 import { apiClient, ApiError } from '@/lib/apiClient';
 import type { SearchFilters, Paper, SavedPaper } from '@/types/paper';
 
@@ -16,6 +17,7 @@ type SearchScope = 'external' | 'library';
 
 export default function SearchPage() {
   const { projectId } = useProject();
+  const { track } = useAnalytics();
   const [query, setQuery] = useState('');
   const [submitted, setSubmitted] = useState('');
   const [scope, setScope] = useState<SearchScope>('external');
@@ -28,6 +30,7 @@ export default function SearchPage() {
     setSubmitted(q);
     setLoading(true);
     setError(null);
+    track('search_run', { query: q, scope });
     try {
       if (scope === 'library') {
         if (!projectId) {
