@@ -6,6 +6,7 @@ import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   signInWithPopup,
+  signInWithRedirect,
   GoogleAuthProvider,
   signOut as firebaseSignOut,
   type User,
@@ -47,7 +48,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   async function signInWithGoogle() {
-    await signInWithPopup(auth, googleProvider);
+    // Prefer the popup flow, but fall back to a full-page redirect when the
+    // popup can't be used/tracked (blocked by the browser, closed early, or
+    // COOP severs our reference to it). onAuthStateChanged picks up the session
+    // when the redirect returns.
+    try {
+      await signInWithPopup(auth, googleProvider);
+    } catch (err) {
+      const code = (err as { code?: string }).code ?? '';
+      const popupFailed =
+        code === 'auth/popup-blocked' ||
+        code === 'auth/popup-closed-by-user' ||
+        code === 'auth/cancelled-popup-request' ||
+        code === 'auth/web-storage-unsupported' ||
+        code === 'auth/internal-error';
+      if (popupFailed) {
+        await signInWithRedirect(auth, googleProvider);
+        return;
+      }
+      throw err;
+    }
   }
 
   async function signOut() {

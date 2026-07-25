@@ -19,6 +19,11 @@ const nextConfig = {
           { key: 'X-Frame-Options', value: 'DENY' },
           { key: 'X-XSS-Protection', value: '1; mode=block' },
           { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
+          // Firebase Google sign-in opens an OAuth popup; this keeps our window's
+          // reference to that popup (so signInWithPopup can detect it closing)
+          // instead of letting COOP sever it. Without it Chrome logs
+          // "Cross-Origin-Opener-Policy policy would block the window.closed call".
+          { key: 'Cross-Origin-Opener-Policy', value: 'same-origin-allow-popups' },
           {
             key: 'Content-Security-Policy',
             value: [

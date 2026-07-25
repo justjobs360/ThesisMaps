@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import {
-  LayoutDashboard, Search, GitFork, AlignLeft,
+  LayoutDashboard, Search, BookMarked, GitFork, AlignLeft,
   Clock, Layers, Lightbulb, Shield, Users, Settings, X,
   type LucideIcon,
 } from 'lucide-react';
@@ -19,6 +19,7 @@ type NavItem = {
 const NAV_ITEMS: NavItem[] = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/search', label: 'Search', icon: Search },
+  { href: '/library', label: 'My Library', icon: BookMarked },
   { href: '/graph', label: 'Knowledge Graph', icon: GitFork },
   { href: '/outline', label: 'Outline Builder', icon: AlignLeft },
   { href: '/timeline', label: 'Timeline', icon: Clock },

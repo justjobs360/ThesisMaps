@@ -41,6 +41,7 @@ export const config = {
     '/dashboard/:path*',
     '/graph/:path*',
     '/search/:path*',
+    '/library/:path*',
     '/outline/:path*',
     '/timeline/:path*',
     '/seeds/:path*',
