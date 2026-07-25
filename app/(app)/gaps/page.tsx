@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
@@ -41,6 +41,18 @@ export default function GapsPage() {
       setLoading(false);
     }
   }
+
+  // Auto-run once per project on load so the page reflects the current library
+  // immediately (consistent with the dashboard's live gap count) instead of
+  // waiting for a manual click. The button remains for re-running on demand.
+  const autoRanFor = useRef<string | null>(null);
+  useEffect(() => {
+    if (projectId && autoRanFor.current !== projectId) {
+      autoRanFor.current = projectId;
+      void runAnalysis();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projectId]);
 
   return (
     <div className="space-y-6 max-w-4xl">

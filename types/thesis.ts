@@ -17,12 +17,20 @@ export const THESIS_STAGES: { id: ThesisStage; label: string }[] = [
   { id: 'defence', label: 'Defence' },
 ];
 
+// Free-form per-project state that doesn't warrant its own table (e.g. the
+// defence checklist). Persisted as a JSONB column on thesis_projects.
+export type ProjectMetadata = {
+  defenceChecklist?: boolean[];
+  [key: string]: unknown;
+};
+
 export type ThesisProject = {
   id: string;
   userId: string;
   title: string;
   field: string;
   currentStage: ThesisStage;
+  metadata: ProjectMetadata;
   createdAt: string;
 };
 

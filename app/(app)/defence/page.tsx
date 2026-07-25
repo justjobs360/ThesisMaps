@@ -66,11 +66,12 @@ function Panel({
 }
 
 export default function DefencePage() {
-  const { projectId } = useProject();
+  const { currentProject, projectId } = useProject();
   const [papers, setPapers] = useState<Paper[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [checked, setChecked] = useState<boolean[]>(() => CHECKLIST.map(() => false));
+  const [checklistSaved, setChecklistSaved] = useState(false);
 
   useEffect(() => {
     if (!projectId) return;
@@ -81,6 +82,31 @@ export default function DefencePage() {
       .catch((err) => setError(err instanceof Error ? err.message : 'Failed to load library'))
       .finally(() => setLoading(false));
   }, [projectId]);
+
+  // Seed the checklist from the persisted project metadata once it loads.
+  useEffect(() => {
+    const stored = currentProject?.metadata?.defenceChecklist;
+    if (Array.isArray(stored)) {
+      setChecked(CHECKLIST.map((_, i) => Boolean(stored[i])));
+    }
+  }, [currentProject]);
+
+  // Persist a checklist change to the project's metadata (fire-and-forget;
+  // local state stays authoritative so the UI never blocks on the round-trip).
+  async function toggleCheck(i: number) {
+    const next = checked.map((c, idx) => (idx === i ? !c : c));
+    setChecked(next);
+    setChecklistSaved(false);
+    if (!projectId) return;
+    try {
+      await apiClient.patch(`/api/projects/${projectId}`, {
+        metadata: { ...(currentProject?.metadata ?? {}), defenceChecklist: next },
+      });
+      setChecklistSaved(true);
+    } catch {
+      /* keep local state; the next toggle will retry the save */
+    }
+  }
 
   const counters = papers.filter((p) => COUNTER_RE.test(textOf(p))).slice(0, 5);
   const contradicting = papers.filter((p) => CONTRADICT_RE.test(textOf(p))).slice(0, 5);
@@ -141,9 +167,14 @@ export default function DefencePage() {
       )}
 
       <section aria-labelledby="checklist-heading" className="bg-white border-2 border-black shadow-impact p-5">
-        <h2 id="checklist-heading" className="font-serif text-lg font-black uppercase tracking-tight text-black mb-4 pb-2 border-b-2 border-black">
-          Defence Checklist
-        </h2>
+        <div className="flex items-center justify-between mb-4 pb-2 border-b-2 border-black">
+          <h2 id="checklist-heading" className="font-serif text-lg font-black uppercase tracking-tight text-black">
+            Defence Checklist
+          </h2>
+          {checklistSaved ? (
+            <span className="text-[10px] font-sans font-black uppercase tracking-widest text-success">Saved</span>
+          ) : null}
+        </div>
         <ul className="space-y-3">
           {CHECKLIST.map((item, i) => (
             <li key={i} className="flex items-start gap-3">
@@ -151,7 +182,7 @@ export default function DefencePage() {
                 type="checkbox"
                 id={`check-${i}`}
                 checked={checked[i] ?? false}
-                onChange={() => setChecked((prev) => prev.map((c, idx) => (idx === i ? !c : c)))}
+                onChange={() => void toggleCheck(i)}
                 className="mt-0.5 h-4 w-4 appearance-none border-2 border-black bg-white checked:bg-accent cursor-pointer flex-shrink-0"
                 aria-label={item}
               />

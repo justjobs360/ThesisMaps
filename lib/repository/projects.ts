@@ -1,5 +1,5 @@
 import { supabaseAdmin } from '@/lib/supabase-server';
-import type { ThesisProject, ThesisStage } from '@/types/thesis';
+import type { ThesisProject, ThesisStage, ProjectMetadata } from '@/types/thesis';
 
 type ProjectRow = {
   id: string;
@@ -7,6 +7,7 @@ type ProjectRow = {
   title: string;
   field: string | null;
   current_stage: string | null;
+  metadata: ProjectMetadata | null;
   created_at: string;
 };
 
@@ -17,6 +18,7 @@ function rowToProject(row: ProjectRow): ThesisProject {
     title: row.title,
     field: row.field ?? '',
     currentStage: (row.current_stage as ThesisStage) ?? 'research_proposal',
+    metadata: row.metadata ?? {},
     createdAt: row.created_at,
   };
 }
@@ -81,12 +83,13 @@ export async function getProject(id: string, userId: string): Promise<ThesisProj
 export async function updateProject(
   id: string,
   userId: string,
-  patch: { title?: string; field?: string; currentStage?: ThesisStage }
+  patch: { title?: string; field?: string; currentStage?: ThesisStage; metadata?: ProjectMetadata }
 ): Promise<ThesisProject | null> {
   const update: Record<string, unknown> = {};
   if (patch.title !== undefined) update.title = patch.title;
   if (patch.field !== undefined) update.field = patch.field;
   if (patch.currentStage !== undefined) update.current_stage = patch.currentStage;
+  if (patch.metadata !== undefined) update.metadata = patch.metadata;
 
   const { data, error } = await supabaseAdmin
     .from('thesis_projects')

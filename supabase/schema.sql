@@ -20,6 +20,7 @@ create table thesis_projects (
   title text not null,
   field text,
   current_stage text default 'research_proposal',
+  metadata jsonb not null default '{}'::jsonb,
   created_at timestamptz default now()
 );
 

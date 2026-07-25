@@ -34,6 +34,12 @@ const patchSchema = z.object({
   title: z.string().min(1).max(200).optional(),
   field: z.string().max(200).optional(),
   currentStage: stageEnum.optional(),
+  // Free-form per-project state (e.g. defence checklist). Sent whole so it
+  // replaces the stored object — clients merge existing keys before sending.
+  metadata: z
+    .object({ defenceChecklist: z.array(z.boolean()).max(50).optional() })
+    .passthrough()
+    .optional(),
 });
 
 // PATCH /api/projects/[id]

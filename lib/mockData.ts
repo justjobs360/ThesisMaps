@@ -82,6 +82,7 @@ export const MOCK_PROJECT: ThesisProject = {
   title: 'The Role of Transformer Architectures in Modern NLP Systems',
   field: 'Computer Science / Artificial Intelligence',
   currentStage: 'literature_review',
+  metadata: {},
   createdAt: '2024-01-15T10:30:00Z',
 };
 
