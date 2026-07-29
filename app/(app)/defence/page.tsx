@@ -4,9 +4,19 @@ import { useEffect, useState } from 'react';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { Badge } from '@/components/ui/Badge';
 import { Skeleton } from '@/components/ui/Skeleton';
+import { Sparkles } from 'lucide-react';
 import { useProject } from '@/hooks/useProject';
 import { apiClient } from '@/lib/apiClient';
 import type { Paper, SavedPaper } from '@/types/paper';
+
+type QA = { point: string; response: string };
+type DefencePrep = {
+  overview: string;
+  counterArguments: QA[];
+  contradictions: QA[];
+  methodologyCritiques: QA[];
+  likelyQuestions: { question: string; answer: string }[];
+};
 
 const CHECKLIST = [
   'I can articulate my core argument in under 2 minutes',
@@ -65,9 +75,50 @@ function Panel({
   );
 }
 
+// AI panel: a list of {point, response} pairs (challenge + how to defend it).
+function QAPanel({
+  id,
+  heading,
+  items,
+  variant,
+}: {
+  id: string;
+  heading: string;
+  items: QA[];
+  variant: 'warning' | 'danger';
+}) {
+  return (
+    <section aria-labelledby={id} className="bg-white border-2 border-black shadow-impact p-5">
+      <h2 id={id} className="font-serif text-lg font-black uppercase tracking-tight text-black mb-4 pb-2 border-b-2 border-black">
+        {heading}
+      </h2>
+      {items.length === 0 ? (
+        <p className="text-[10px] text-black/40 font-bold uppercase tracking-widest py-4 text-center">None identified.</p>
+      ) : (
+        <ul className="space-y-4">
+          {items.map((qa, i) => (
+            <li key={i} className="border-b border-black/20 pb-4 last:border-0">
+              <div className="flex items-start gap-2">
+                <Badge variant={variant}>{variant === 'danger' ? 'Challenge' : 'Critique'}</Badge>
+              </div>
+              <p className="text-[12px] font-sans font-black text-black mt-2 leading-snug">{qa.point}</p>
+              <p className="text-[11px] font-sans text-black/70 mt-1.5 leading-relaxed">
+                <span className="font-black text-accent uppercase tracking-wider text-[9px]">Defence · </span>
+                {qa.response}
+              </p>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+
 export default function DefencePage() {
   const { currentProject, projectId } = useProject();
   const [papers, setPapers] = useState<Paper[]>([]);
+  const [prep, setPrep] = useState<DefencePrep | null>(null);
+  const [aiAvailable, setAiAvailable] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [checked, setChecked] = useState<boolean[]>(() => CHECKLIST.map(() => false));
@@ -76,10 +127,21 @@ export default function DefencePage() {
   useEffect(() => {
     if (!projectId) return;
     setLoading(true);
-    apiClient
-      .get<{ papers: SavedPaper[] }>(`/api/papers/save?projectId=${projectId}`)
-      .then(({ papers: saved }) => setPapers(saved.map((s) => s.paper)))
-      .catch((err) => setError(err instanceof Error ? err.message : 'Failed to load library'))
+    setError(null);
+    // Library (for the heuristic fallback + empty check) and the AI defence prep
+    // load together; the AI call is the slow one (~8s), so we wait for both.
+    Promise.allSettled([
+      apiClient.get<{ papers: SavedPaper[] }>(`/api/papers/save?projectId=${projectId}`),
+      apiClient.get<{ aiAvailable: boolean; prep: DefencePrep | null }>(`/api/defence?projectId=${projectId}`),
+    ])
+      .then(([libRes, prepRes]) => {
+        if (libRes.status === 'fulfilled') setPapers(libRes.value.papers.map((s) => s.paper));
+        else setError(libRes.reason instanceof Error ? libRes.reason.message : 'Failed to load library');
+        if (prepRes.status === 'fulfilled') {
+          setAiAvailable(prepRes.value.aiAvailable);
+          setPrep(prepRes.value.prep);
+        }
+      })
       .finally(() => setLoading(false));
   }, [projectId]);
 
@@ -119,13 +181,23 @@ export default function DefencePage() {
         subtitle="Prepare for the toughest questions by reviewing challenges to your thesis."
       />
 
-      <div className="border-2 border-black bg-black px-4 py-3">
+      <div className="border-2 border-black bg-black px-4 py-3 flex items-center justify-between">
         <p className="text-[10px] font-sans font-black uppercase tracking-[0.2em] text-white">Stage // Defence Preparation</p>
+        {aiAvailable && prep ? (
+          <span className="flex items-center gap-1.5 text-[10px] font-sans font-black uppercase tracking-widest text-accent">
+            <Sparkles size={11} strokeWidth={2.5} /> AI-Generated
+          </span>
+        ) : null}
       </div>
 
       {loading ? (
-        <div className="grid md:grid-cols-3 gap-5">
-          {Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-56 w-full" />)}
+        <div className="space-y-5">
+          <p className="text-[10px] font-sans font-black uppercase tracking-[0.2em] text-black/50 animate-pulse">
+            Generating your personalized defence analysis…
+          </p>
+          <div className="grid md:grid-cols-3 gap-5">
+            {Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-56 w-full" />)}
+          </div>
         </div>
       ) : error ? (
         <div className="bg-white border-2 border-black shadow-impact p-5">
@@ -137,32 +209,68 @@ export default function DefencePage() {
           <p className="text-black/40 font-sans font-bold uppercase tracking-[0.2em] text-[10px]">Your library is empty</p>
           <p className="text-black/40 font-sans text-xs mt-2">Save papers from Search — challenging papers will be surfaced here.</p>
         </div>
+      ) : aiAvailable && prep ? (
+        <div className="space-y-5">
+          <div className="bg-white border-2 border-black shadow-impact p-5">
+            <p className="text-sm font-sans text-black leading-relaxed">{prep.overview}</p>
+          </div>
+          <div className="grid md:grid-cols-3 gap-5">
+            <QAPanel id="counter-heading" heading="Counter-Arguments" items={prep.counterArguments} variant="warning" />
+            <QAPanel id="contradicting-heading" heading="Contradicting Findings" items={prep.contradictions} variant="danger" />
+            <QAPanel id="methodology-heading" heading="Methodology Critiques" items={prep.methodologyCritiques} variant="warning" />
+          </div>
+          {prep.likelyQuestions.length > 0 ? (
+            <section aria-labelledby="questions-heading" className="bg-white border-2 border-black shadow-impact p-5">
+              <h2 id="questions-heading" className="font-serif text-lg font-black uppercase tracking-tight text-black mb-4 pb-2 border-b-2 border-black">
+                Likely Viva Questions
+              </h2>
+              <ul className="space-y-4">
+                {prep.likelyQuestions.map((q, i) => (
+                  <li key={i} className="border-b border-black/20 pb-4 last:border-0">
+                    <p className="text-[13px] font-sans font-black text-black leading-snug">Q{i + 1}. {q.question}</p>
+                    <p className="text-xs font-sans text-black/70 mt-1.5 leading-relaxed">{q.answer}</p>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ) : null}
+        </div>
       ) : (
-        <div className="grid md:grid-cols-3 gap-5">
-          <Panel
-            id="counter-heading"
-            heading="Counter-Arguments"
-            papers={counters}
-            badge="Challenges claim"
-            variant="warning"
-            emptyLabel="No counter-arguments detected in your library."
-          />
-          <Panel
-            id="contradicting-heading"
-            heading="Contradicting Findings"
-            papers={contradicting}
-            badge="Contradicts"
-            variant="danger"
-            emptyLabel="No contradicting findings detected."
-          />
-          <Panel
-            id="methodology-heading"
-            heading="Methodology Critiques"
-            papers={critiques}
-            badge="Methodology critique"
-            variant="warning"
-            emptyLabel="No methodology critiques detected."
-          />
+        <div className="space-y-5">
+          {!aiAvailable ? (
+            <div className="border-2 border-black bg-accent/5 p-3">
+              <p className="text-[10px] font-sans font-black uppercase tracking-widest text-black">Heuristic mode</p>
+              <p className="text-xs text-black/60 font-sans mt-1">
+                Add <code className="font-mono text-accent">OPENAI_API_KEY</code> to <code className="font-mono">.env</code> for a personalized, thesis-specific defence analysis instead of keyword matching.
+              </p>
+            </div>
+          ) : null}
+          <div className="grid md:grid-cols-3 gap-5">
+            <Panel
+              id="counter-heading"
+              heading="Counter-Arguments"
+              papers={counters}
+              badge="Challenges claim"
+              variant="warning"
+              emptyLabel="No counter-arguments detected in your library."
+            />
+            <Panel
+              id="contradicting-heading"
+              heading="Contradicting Findings"
+              papers={contradicting}
+              badge="Contradicts"
+              variant="danger"
+              emptyLabel="No contradicting findings detected."
+            />
+            <Panel
+              id="methodology-heading"
+              heading="Methodology Critiques"
+              papers={critiques}
+              badge="Methodology critique"
+              variant="warning"
+              emptyLabel="No methodology critiques detected."
+            />
+          </div>
         </div>
       )}
 
