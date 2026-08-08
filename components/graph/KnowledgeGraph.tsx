@@ -7,7 +7,8 @@ import ReactFlow, {
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, ExternalLink } from 'lucide-react';
+import { X, ExternalLink, Sparkles } from 'lucide-react';
+import { apiClient } from '@/lib/apiClient';
 import { PaperNode, type PaperNodeData } from './PaperNode';
 import { edgeTypes } from './EdgeTypes';
 import { GraphControls } from './GraphControls';
@@ -37,15 +38,19 @@ const EDGE_COLORS: Record<string, string> = {
   co_author: '#94A3B8',
 };
 
+type SimilarPaper = { id: string; title: string; year: number | null; similarity: number };
+
 type KnowledgeGraphProps = {
   data: GraphData;
   showMinimap: boolean;
   heatmapMode: HeatmapMode;
   onToggleMinimap: () => void;
   onHeatmapChange: (mode: HeatmapMode) => void;
+  /** Enables the "Find similar papers" action in the node detail panel. */
+  projectId?: string;
 };
 
-export function KnowledgeGraph({ data, showMinimap, heatmapMode, onToggleMinimap, onHeatmapChange }: KnowledgeGraphProps) {
+export function KnowledgeGraph({ data, showMinimap, heatmapMode, onToggleMinimap, onHeatmapChange, projectId }: KnowledgeGraphProps) {
   const maxCitations = useMemo(
     () => data.nodes.reduce((m, n) => Math.max(m, n.paper.citationCount || 0), 0),
     [data.nodes]
@@ -55,6 +60,34 @@ export function KnowledgeGraph({ data, showMinimap, heatmapMode, onToggleMinimap
   const [edges, setEdges, onEdgesChange] = useEdgesState(buildEdges(data.edges));
   const [selectedPaper, setSelectedPaper] = useState<Paper | null>(null);
   const { zoomIn, zoomOut, fitView } = useReactFlow();
+
+  // "Find similar papers" — embedding-backed nearest neighbours.
+  const [similar, setSimilar] = useState<SimilarPaper[] | null>(null);
+  const [similarLoading, setSimilarLoading] = useState(false);
+  const [similarNote, setSimilarNote] = useState<string | null>(null);
+
+  const findSimilar = useCallback(async () => {
+    if (!selectedPaper || !projectId || similarLoading) return;
+    setSimilarLoading(true);
+    setSimilarNote(null);
+    setSimilar(null);
+    try {
+      const res = await apiClient.post<{ aiAvailable: boolean; papers: SimilarPaper[] }>(
+        '/api/papers/similar',
+        { projectId, paperId: selectedPaper.id }
+      );
+      if (!res.aiAvailable) {
+        setSimilarNote('Add OPENAI_API_KEY to .env to enable semantic similarity.');
+      } else if (res.papers.length === 0) {
+        setSimilarNote('No similar papers yet — save a few more, or run the embedding backfill.');
+      }
+      setSimilar(res.papers);
+    } catch (err) {
+      setSimilarNote(err instanceof Error ? err.message : 'Could not find similar papers.');
+    } finally {
+      setSimilarLoading(false);
+    }
+  }, [selectedPaper, projectId, similarLoading]);
 
   // Rebuild fully when the underlying graph data changes.
   useEffect(() => {
@@ -70,6 +103,9 @@ export function KnowledgeGraph({ data, showMinimap, heatmapMode, onToggleMinimap
 
   const onNodeClick: NodeMouseHandler = useCallback((_, node) => {
     setSelectedPaper((node.data as GraphNode).paper);
+    // Reset per-paper similarity state when switching nodes.
+    setSimilar(null);
+    setSimilarNote(null);
   }, []);
 
   const handleExport = useCallback(() => {
@@ -223,6 +259,39 @@ export function KnowledgeGraph({ data, showMinimap, heatmapMode, onToggleMinimap
                 >
                   <ExternalLink size={14} strokeWidth={2} /> Open Source
                 </a>
+              ) : null}
+
+              {projectId ? (
+                <button
+                  onClick={() => void findSimilar()}
+                  disabled={similarLoading}
+                  className="mt-2 flex items-center justify-center gap-2 w-full h-10 border-2 border-black bg-white text-black font-sans font-black text-[10px] uppercase tracking-widest hover:bg-black hover:text-white transition-colors disabled:opacity-50"
+                >
+                  <Sparkles size={14} strokeWidth={2} />
+                  {similarLoading ? 'Searching…' : 'Find Similar Papers'}
+                </button>
+              ) : null}
+
+              {similarNote ? (
+                <p className="mt-3 text-[11px] font-sans text-black/50 leading-relaxed">{similarNote}</p>
+              ) : null}
+
+              {similar && similar.length > 0 ? (
+                <div className="mt-4">
+                  <h3 className="text-[10px] font-sans font-black uppercase tracking-[0.2em] text-black/50 mb-2">
+                    Similar in your library
+                  </h3>
+                  <ul className="space-y-2">
+                    {similar.map((s) => (
+                      <li key={s.id} className="border-l-2 border-accent pl-2">
+                        <p className="text-[11px] font-sans font-bold text-black leading-snug line-clamp-2">{s.title}</p>
+                        <p className="text-[10px] font-sans text-black/40 mt-0.5">
+                          {s.year || '—'} · {Math.round(s.similarity * 100)}% match
+                        </p>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
               ) : null}
             </div>
           </motion.aside>

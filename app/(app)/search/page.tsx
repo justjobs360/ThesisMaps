@@ -132,13 +132,11 @@ export default function SearchPage() {
         return;
       }
 
-      const res = await fetch(`/api/papers/search?q=${encodeURIComponent(q)}`);
-      const data = (await res.json()) as { papers?: Paper[]; error?: string };
-      if (!res.ok) {
-        setResults([]);
-        setError(data.error ?? `Search failed (${res.status})`);
-        return;
-      }
+      // Must go through apiClient: /api/papers/search is authed (it spends our
+      // upstream API keys), so a raw fetch would 401.
+      const data = await apiClient.get<{ papers?: Paper[] }>(
+        `/api/papers/search?q=${encodeURIComponent(q)}&pageSize=50`
+      );
       setResults(data.papers ?? []);
     } catch (err) {
       setResults([]);

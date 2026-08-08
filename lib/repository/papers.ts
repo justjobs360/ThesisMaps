@@ -80,5 +80,14 @@ export async function upsertPaper(paper: Paper): Promise<string> {
     .single();
 
   if (error || !data) throw new Error(`upsertPaper failed: ${error?.message ?? 'no row returned'}`);
-  return data.id as string;
+
+  const paperUuid = data.id as string;
+
+  // Fire-and-forget: embedding is a ~1s network round-trip, and the Save button
+  // must not wait on it. A miss here is recoverable via the backfill route.
+  void import('@/lib/embeddings')
+    .then(({ embedPaperById }) => embedPaperById(paperUuid, paper))
+    .catch(() => undefined);
+
+  return paperUuid;
 }

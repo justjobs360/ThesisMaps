@@ -1,6 +1,5 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import Image from 'next/image';
 import {
   GitFork, AlignLeft, Lightbulb, Shield, Clock, Search, Users,
 } from 'lucide-react';
@@ -15,6 +14,23 @@ export const metadata: Metadata = {
     'Map your literature, discover research gaps, and build your thesis with confidence. The visual research platform built for PhD and masters students.',
   alternates: { canonical: 'https://www.thesismaps.com' },
 };
+
+// schema.org SoftwareApplication markup for the landing page. `<` and `>` are
+// escaped to their \u.... forms so a future dynamic value can never break out of
+// the <script> block. (The previous version called .replace(/</g, '<'), which
+// replaced the character with itself and therefore escaped nothing.)
+const JSON_LD = JSON.stringify({
+  '@context': 'https://schema.org',
+  '@type': 'SoftwareApplication',
+  name: 'ThesisMaps',
+  applicationCategory: 'EducationalApplication',
+  operatingSystem: 'Web',
+  url: 'https://www.thesismaps.com',
+  description: 'Visual Research Intelligence Platform for graduate-level thesis research.',
+  offers: { '@type': 'Offer', price: '0', priceCurrency: 'GBP' },
+})
+  .replace(/</g, '\\u003c')
+  .replace(/>/g, '\\u003e');
 
 const FEATURES = [
   {
@@ -57,6 +73,8 @@ const STAGES = ['Proposal', 'Lit Review', 'Methodology', 'Data', 'Analysis', 'Wr
 export default function LandingPage() {
   return (
     <>
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON_LD }} />
+
       <MarketingHeader />
 
       <main>

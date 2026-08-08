@@ -3,13 +3,16 @@
 import React, { useEffect, useState } from 'react';
 import { DndContext, closestCenter, type DragEndEvent } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy, arrayMove } from '@dnd-kit/sortable';
-import { Plus, FileText, X } from 'lucide-react';
+import { Plus, FileText, X, Sparkles, Check } from 'lucide-react';
 import { ChapterSection } from './ChapterSection';
 import { CoverageScore } from './CoverageScore';
+import { AiResultModal } from '@/components/ai/AiResultModal';
 import { useOutline } from '@/hooks/useOutline';
 import { useProject } from '@/hooks/useProject';
-import { apiClient } from '@/lib/apiClient';
+import { apiClient, ApiError } from '@/lib/apiClient';
 import type { SavedPaper } from '@/types/paper';
+
+type SuggestedSection = { title: string; rationale: string };
 
 export function OutlineBuilder() {
   const { projectId } = useProject();
@@ -22,6 +25,42 @@ export function OutlineBuilder() {
   const [showTree, setShowTree] = useState(false);
   const [newTitle, setNewTitle] = useState('');
   const [library, setLibrary] = useState<SavedPaper[]>([]);
+
+  // --- AI outline suggestions ---
+  const [suggestOpen, setSuggestOpen] = useState(false);
+  const [suggestions, setSuggestions] = useState<SuggestedSection[]>([]);
+  const [suggestLoading, setSuggestLoading] = useState(false);
+  const [suggestError, setSuggestError] = useState<string | null>(null);
+  const [suggestAiAvailable, setSuggestAiAvailable] = useState(true);
+  const [accepted, setAccepted] = useState<Set<string>>(new Set());
+
+  async function openSuggestions() {
+    if (!projectId) return;
+    setSuggestOpen(true);
+    setSuggestLoading(true);
+    setSuggestError(null);
+    setSuggestions([]);
+    setAccepted(new Set());
+    try {
+      const res = await apiClient.post<{ aiAvailable: boolean; sections: SuggestedSection[] }>(
+        '/api/outline/suggest',
+        { projectId }
+      );
+      setSuggestAiAvailable(res.aiAvailable);
+      setSuggestions(res.sections ?? []);
+    } catch (err) {
+      setSuggestError(err instanceof ApiError ? err.message : 'Could not generate suggestions.');
+    } finally {
+      setSuggestLoading(false);
+    }
+  }
+
+  // Accepting creates a REAL persisted section via the existing outline hook.
+  async function acceptSuggestion(title: string) {
+    if (accepted.has(title)) return;
+    setAccepted((prev) => new Set(prev).add(title));
+    await addSection(title);
+  }
 
   // Load the project's saved library once — used to assign papers to sections.
   useEffect(() => {
@@ -140,6 +179,14 @@ export function OutlineBuilder() {
               <Plus size={16} strokeWidth={3} />
             </button>
           </form>
+
+          <button
+            onClick={() => void openSuggestions()}
+            disabled={!projectId}
+            className="mt-2 w-full h-10 flex items-center justify-center gap-2 border-2 border-black bg-white text-black text-[10px] font-sans font-black uppercase tracking-widest hover:bg-black hover:text-white transition-colors disabled:opacity-40"
+          >
+            <Sparkles size={13} strokeWidth={2.5} /> Suggest Structure
+          </button>
         </div>
       </aside>
 
@@ -229,6 +276,51 @@ export function OutlineBuilder() {
           </div>
         )}
       </main>
+
+      {/* AI-suggested chapter structure */}
+      <AiResultModal
+        open={suggestOpen}
+        onClose={() => setSuggestOpen(false)}
+        title="Suggested Structure"
+        description="Chapters proposed from your saved library. Accept the ones you want."
+        loading={suggestLoading}
+        error={suggestError}
+        aiAvailable={suggestAiAvailable}
+        loadingLabel="Reading your library…"
+      >
+        {suggestions.length === 0 && suggestAiAvailable ? (
+          <p className="text-sm font-sans text-black/50">
+            No suggestions — save some papers to your library first, then try again.
+          </p>
+        ) : (
+          <ul className="space-y-3">
+            {suggestions.map((s) => {
+              const isAccepted = accepted.has(s.title);
+              return (
+                <li key={s.title} className="border-2 border-black p-3 flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-[12px] font-sans font-black uppercase tracking-tight text-black">{s.title}</p>
+                    <p className="text-xs font-sans text-black/60 mt-1 leading-relaxed">{s.rationale}</p>
+                  </div>
+                  <button
+                    onClick={() => void acceptSuggestion(s.title)}
+                    disabled={isAccepted}
+                    aria-label={`Add section ${s.title}`}
+                    className={[
+                      'flex-shrink-0 h-8 px-3 border-2 border-black text-[10px] font-sans font-black uppercase tracking-widest transition-colors',
+                      isAccepted
+                        ? 'bg-success text-white border-success cursor-default'
+                        : 'bg-white text-black hover:bg-black hover:text-white',
+                    ].join(' ')}
+                  >
+                    {isAccepted ? <Check size={13} strokeWidth={3} /> : 'Add'}
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </AiResultModal>
     </div>
   );
 }

@@ -48,6 +48,7 @@ export default function GraphPage() {
               heatmapMode={heatmapMode}
               onToggleMinimap={() => setShowMinimap((v) => !v)}
               onHeatmapChange={setHeatmapMode}
+              projectId={projectId}
             />
           </ReactFlowProvider>
         )}

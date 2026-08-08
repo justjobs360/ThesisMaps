@@ -16,6 +16,8 @@ export type DefencePrep = {
   contradictions: QA[];
   methodologyCritiques: QA[];
   likelyQuestions: { question: string; answer: string }[];
+  /** Preparation actions derived from the issues identified above. */
+  checklist: string[];
 };
 
 // GET /api/defence?projectId=... — AI-generated defence preparation grounded in
@@ -60,7 +62,9 @@ export async function GET(request: Request) {
           '"counterArguments": [{ "point": string, "response": string }] (3-4 counter-arguments to the thesis + how to rebut), ' +
           '"contradictions": [{ "point": string, "response": string }] (2-3 findings/positions that may contradict the work + how to reconcile), ' +
           '"methodologyCritiques": [{ "point": string, "response": string }] (2-3 likely methodology critiques + defences), ' +
-          '"likelyQuestions": [{ "question": string, "answer": string }] (4-5 tough viva questions + strong suggested answers) }.',
+          '"likelyQuestions": [{ "question": string, "answer": string }] (4-5 tough viva questions + strong suggested answers), ' +
+          '"checklist": string[] (5-7 concrete preparation actions derived from the specific issues you identified ' +
+          'above — each must be a single actionable task the student can tick off, not a restatement of a critique) }.',
       },
       {
         role: 'user',

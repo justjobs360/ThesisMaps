@@ -20,7 +20,12 @@ export const THESIS_STAGES: { id: ThesisStage; label: string }[] = [
 // Free-form per-project state that doesn't warrant its own table (e.g. the
 // defence checklist). Persisted as a JSONB column on thesis_projects.
 export type ProjectMetadata = {
-  defenceChecklist?: boolean[];
+  /**
+   * Defence checklist ticks keyed by a slug of the item text. The legacy
+   * `boolean[]` shape (positional, from when the checklist was hard-coded) is
+   * still read for backwards compatibility — see app/(app)/defence/page.tsx.
+   */
+  defenceChecklist?: Record<string, boolean> | boolean[];
   [key: string]: unknown;
 };
 

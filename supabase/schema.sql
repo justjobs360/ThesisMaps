@@ -1,7 +1,7 @@
 -- Enable vector extension for embeddings
 create extension if not exists vector;
 
-create table users (
+create table if not exists users (
   id text primary key,
   email text unique not null,
   name text,
@@ -14,7 +14,7 @@ create table users (
   last_active_at timestamptz
 );
 
-create table thesis_projects (
+create table if not exists thesis_projects (
   id uuid primary key default gen_random_uuid(),
   user_id text references users(id) on delete cascade,
   title text not null,
@@ -24,7 +24,7 @@ create table thesis_projects (
   created_at timestamptz default now()
 );
 
-create table papers (
+create table if not exists papers (
   id uuid primary key default gen_random_uuid(),
   doi text unique,
   arxiv_id text,
@@ -42,7 +42,18 @@ create table papers (
   created_at timestamptz default now()
 );
 
-create table saved_papers (
+-- Per-word (stemmed, indexed) full-text search over the papers catalogue, used
+-- for searching a project's saved library. Depended on by
+-- lib/repository/savedPapers.ts (searchSavedPapers -> papers.search_vector).
+-- Mirrors supabase/migrations/001_papers_search_index.sql for fresh installs.
+alter table papers
+  add column if not exists search_vector tsvector
+  generated always as (
+    setweight(to_tsvector('english', coalesce(title, '')), 'A') ||
+    setweight(to_tsvector('english', coalesce(abstract, '')), 'B')
+  ) stored;
+
+create table if not exists saved_papers (
   id uuid primary key default gen_random_uuid(),
   user_id text references users(id) on delete cascade,
   project_id uuid references thesis_projects(id) on delete cascade,
@@ -55,7 +66,7 @@ create table saved_papers (
   unique(user_id, project_id, paper_id)
 );
 
-create table outline_sections (
+create table if not exists outline_sections (
   id uuid primary key default gen_random_uuid(),
   project_id uuid references thesis_projects(id) on delete cascade,
   title text not null,
@@ -64,7 +75,7 @@ create table outline_sections (
   created_at timestamptz default now()
 );
 
-create table section_papers (
+create table if not exists section_papers (
   id uuid primary key default gen_random_uuid(),
   section_id uuid references outline_sections(id) on delete cascade,
   paper_id uuid references papers(id) on delete cascade,
@@ -72,7 +83,7 @@ create table section_papers (
   unique(section_id, paper_id)
 );
 
-create table seed_sets (
+create table if not exists seed_sets (
   id uuid primary key default gen_random_uuid(),
   project_id uuid references thesis_projects(id) on delete cascade,
   name text not null,
@@ -80,7 +91,7 @@ create table seed_sets (
   created_at timestamptz default now()
 );
 
-create table collaborations (
+create table if not exists collaborations (
   id uuid primary key default gen_random_uuid(),
   project_id uuid references thesis_projects(id) on delete cascade,
   user_id text references users(id) on delete cascade,
@@ -88,7 +99,7 @@ create table collaborations (
   unique(project_id, user_id)
 );
 
-create table comments (
+create table if not exists comments (
   id uuid primary key default gen_random_uuid(),
   paper_id uuid references papers(id) on delete cascade,
   user_id text references users(id) on delete cascade,
@@ -97,7 +108,7 @@ create table comments (
   created_at timestamptz default now()
 );
 
-create table saved_searches (
+create table if not exists saved_searches (
   id uuid primary key default gen_random_uuid(),
   user_id text references users(id) on delete cascade,
   query text not null,
@@ -105,7 +116,7 @@ create table saved_searches (
   last_run_at timestamptz default now()
 );
 
-create table feedback (
+create table if not exists feedback (
   id uuid primary key default gen_random_uuid(),
   user_id text references users(id) on delete set null,
   type text not null,
@@ -116,7 +127,7 @@ create table feedback (
   created_at timestamptz default now()
 );
 
-create table flags (
+create table if not exists flags (
   id uuid primary key default gen_random_uuid(),
   flagged_by text references users(id) on delete set null,
   entity_type text not null,
@@ -127,7 +138,7 @@ create table flags (
   created_at timestamptz default now()
 );
 
-create table analytics_events (
+create table if not exists analytics_events (
   id uuid primary key default gen_random_uuid(),
   user_id text references users(id) on delete set null,
   event text not null,
@@ -135,7 +146,7 @@ create table analytics_events (
   created_at timestamptz default now()
 );
 
-create table admin_activity_log (
+create table if not exists admin_activity_log (
   id uuid primary key default gen_random_uuid(),
   admin_id text references users(id) on delete set null,
   action text not null,
@@ -145,7 +156,7 @@ create table admin_activity_log (
   created_at timestamptz default now()
 );
 
-create table platform_settings (
+create table if not exists platform_settings (
   key text primary key,
   value jsonb not null,
   updated_by text references users(id),
@@ -155,16 +166,18 @@ create table platform_settings (
 -- Seed default platform settings
 insert into platform_settings (key, value) values
   ('feature_flags', '{"ml_gap_detection": true, "collaboration": true, "defence_mode": true}'),
-  ('announcement_banner', '{"enabled": false, "message": ""}');
+  ('announcement_banner', '{"enabled": false, "message": ""}')
+on conflict (key) do nothing;
 
 -- Indexes for common queries
-create index idx_saved_papers_user_project on saved_papers(user_id, project_id);
-create index idx_papers_doi on papers(doi);
-create index idx_papers_arxiv on papers(arxiv_id);
-create index idx_outline_sections_project on outline_sections(project_id);
-create index idx_analytics_events_user on analytics_events(user_id, created_at);
-create index idx_flags_status on flags(status);
-create index idx_feedback_status on feedback(status);
+create index if not exists idx_saved_papers_user_project on saved_papers(user_id, project_id);
+create index if not exists idx_papers_doi on papers(doi);
+create index if not exists idx_papers_search_vector on papers using gin (search_vector);
+create index if not exists idx_papers_arxiv on papers(arxiv_id);
+create index if not exists idx_outline_sections_project on outline_sections(project_id);
+create index if not exists idx_analytics_events_user on analytics_events(user_id, created_at);
+create index if not exists idx_flags_status on flags(status);
+create index if not exists idx_feedback_status on feedback(status);
 
 -- Vector similarity index (IVFFlat for approximate nearest-neighbour search)
-create index on papers using ivfflat (embedding vector_cosine_ops) with (lists = 100);
+create index if not exists idx_papers_embedding on papers using ivfflat (embedding vector_cosine_ops) with (lists = 100);

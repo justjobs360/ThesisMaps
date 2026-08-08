@@ -34,13 +34,14 @@ export const metadata: Metadata = {
     siteName: 'ThesisMaps',
     title: 'ThesisMaps — Visual Research Intelligence',
     description: 'Map your literature. Find the gaps. Write with confidence.',
-    images: [{ url: '/og-image.png', width: 1200, height: 630, alt: 'ThesisMaps — Visual Research Intelligence Platform' }],
+    // Images intentionally omitted: app/opengraph-image.tsx generates them and
+    // Next injects the tags automatically. Hardcoding /og-image.png here pointed
+    // at a file that never existed (public/ is empty).
   },
   twitter: {
     card: 'summary_large_image',
     title: 'ThesisMaps — Visual Research Intelligence',
     description: 'Map your literature. Find the gaps. Write with confidence.',
-    images: ['/og-image.png'],
   },
   keywords: ['thesis research', 'literature review', 'knowledge graph', 'PhD tools', 'research gaps', 'citation map'],
   robots: { index: true, follow: true },
@@ -49,30 +50,8 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className={[instrumentSerif.variable, dmSans.variable].join(' ')}>
-      <head>
-        <script
-          type="application/ld+json"
-          dangerouslySetInnerHTML={{
-            __html: JSON.stringify({
-              '@context': 'https://schema.org',
-              '@type': 'SoftwareApplication',
-              name: 'ThesisMaps',
-              applicationCategory: 'EducationalApplication',
-              operatingSystem: 'Web',
-              url: 'https://www.thesismaps.com',
-              description:
-                'Visual Research Intelligence Platform for graduate-level thesis research.',
-              offers: {
-                '@type': 'Offer',
-                price: '0',
-                priceCurrency: 'GBP',
-              },
-            })
-              .replace(/</g, '<')
-              .replace(/>/g, '>'),
-          }}
-        />
-      </head>
+      {/* JSON-LD lives on the landing page (app/page.tsx), not here — in the root
+          layout it was injected into every route, including /admin. */}
       <body>
         <AuthProvider>{children}</AuthProvider>
       </body>

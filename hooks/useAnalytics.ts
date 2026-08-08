@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback } from 'react';
-import { useAuth } from './useAuth';
+import { apiClient } from '@/lib/apiClient';
 
 type EventName =
   | 'paper_saved'
@@ -13,19 +13,12 @@ type EventName =
   | 'seed_set_created';
 
 export function useAnalytics() {
-  const { user } = useAuth();
-
-  const track = useCallback(
-    (event: EventName, properties?: Record<string, unknown>) => {
-      // Fire-and-forget — non-blocking
-      void fetch('/api/analytics', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ event, properties, userId: user?.uid }),
-      }).catch(() => undefined);
-    },
-    [user]
-  );
+  // Goes through apiClient so the Firebase token is attached — the route derives
+  // the user id from that token rather than trusting a client-supplied one.
+  const track = useCallback((event: EventName, properties?: Record<string, unknown>) => {
+    // Fire-and-forget — analytics must never block or surface errors.
+    void apiClient.post('/api/analytics', { event, properties }).catch(() => undefined);
+  }, []);
 
   return { track };
 }

@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
+import { createHash } from 'crypto';
 import { z } from 'zod';
+import { requireUser } from '@/lib/admin-guard';
 import { redis, cacheKey, CACHE_TTL } from '@/lib/redis';
 import { searchSemanticScholar } from '@/lib/api/semanticScholar';
 import { searchOpenAlex } from '@/lib/api/openAlex';
@@ -18,7 +20,21 @@ const querySchema = z.object({
   pageSize: z.coerce.number().int().min(1).max(50).default(20),
 });
 
+/** Page out of the full deduped result set. */
+function paginate(papers: Paper[], page: number, pageSize: number) {
+  const start = (page - 1) * pageSize;
+  return papers.slice(start, start + pageSize);
+}
+
 export async function GET(request: Request) {
+  // Authed: this route fans out to eight upstream academic APIs on our keys and
+  // writes to Redis, so it must not be open to anonymous callers.
+  try {
+    await requireUser(request);
+  } catch {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
   const { searchParams } = new URL(request.url);
 
   const parsed = querySchema.safeParse({
@@ -31,13 +47,24 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'Invalid query parameters', details: parsed.error.flatten() }, { status: 400 });
   }
 
-  const { q, page } = parsed.data;
-  const ck = cacheKey('search', q, String(page));
+  const { q, page, pageSize } = parsed.data;
+  // Cache the FULL result set per query (hashed so a 500-char query doesn't
+  // become a 500-char Redis key); pagination is applied on the way out, so
+  // paging through results never re-hits the upstream APIs.
+  const qHash = createHash('sha256').update(q.toLowerCase().trim()).digest('hex').slice(0, 32);
+  const ck = cacheKey('search', qHash);
 
   try {
     const cached = await redis.get<Paper[]>(ck);
     if (cached) {
-      return NextResponse.json({ papers: cached, total: cached.length, query: q, cached: true });
+      return NextResponse.json({
+        papers: paginate(cached, page, pageSize),
+        total: cached.length,
+        page,
+        pageSize,
+        query: q,
+        cached: true,
+      });
     }
   } catch {
     // Redis unavailable — proceed without cache
@@ -83,7 +110,13 @@ export async function GET(request: Request) {
       // Ignore cache write failures
     }
 
-    return NextResponse.json({ papers, total: papers.length, query: q });
+    return NextResponse.json({
+      papers: paginate(papers, page, pageSize),
+      total: papers.length,
+      page,
+      pageSize,
+      query: q,
+    });
   } catch (err) {
     console.error('[papers/search]', err);
     return NextResponse.json({ error: 'Search failed' }, { status: 502 });

@@ -5,10 +5,18 @@ import { PageHeader } from '@/components/layout/PageHeader';
 import { SkeletonCard } from '@/components/ui/Skeleton';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
-import { ExternalLink, Quote, Trash2 } from 'lucide-react';
+import { ExternalLink, Quote, Trash2, Sparkles } from 'lucide-react';
+import { AiResultModal, AiList } from '@/components/ai/AiResultModal';
 import { useProject } from '@/hooks/useProject';
-import { apiClient } from '@/lib/apiClient';
+import { apiClient, ApiError } from '@/lib/apiClient';
 import type { SavedPaper } from '@/types/paper';
+
+type PaperInsight = {
+  summary: string;
+  relevance: string;
+  limitations: string[];
+  suggestedSection: string;
+};
 
 const SOURCE_LABELS: Record<string, string> = {
   semantic_scholar: 'Semantic Scholar',
@@ -77,6 +85,33 @@ export default function LibraryPage() {
       await apiClient.del('/api/papers/save', { savedId: sp.id });
     } catch {
       setSaved(prev); // restore on failure
+    }
+  }
+
+  // --- AI paper insight ---
+  const [insightFor, setInsightFor] = useState<SavedPaper | null>(null);
+  const [insight, setInsight] = useState<PaperInsight | null>(null);
+  const [insightLoading, setInsightLoading] = useState(false);
+  const [insightError, setInsightError] = useState<string | null>(null);
+  const [insightAiAvailable, setInsightAiAvailable] = useState(true);
+
+  async function analyse(sp: SavedPaper) {
+    if (!projectId) return;
+    setInsightFor(sp);
+    setInsight(null);
+    setInsightError(null);
+    setInsightLoading(true);
+    try {
+      const res = await apiClient.post<{ aiAvailable: boolean; insight: PaperInsight | null }>(
+        '/api/papers/insight',
+        { projectId, paperId: sp.paper.id }
+      );
+      setInsightAiAvailable(res.aiAvailable);
+      setInsight(res.insight);
+    } catch (err) {
+      setInsightError(err instanceof ApiError ? err.message : 'Could not analyse this paper.');
+    } finally {
+      setInsightLoading(false);
     }
   }
 
@@ -160,6 +195,14 @@ export default function LibraryPage() {
                     <Badge variant={READ_VARIANT[sp.readStatus]}>{sp.readStatus}</Badge>
                   </button>
                   <button
+                    onClick={() => void analyse(sp)}
+                    aria-label="Analyse how this paper fits your thesis"
+                    title="How does this fit my thesis?"
+                    className="flex items-center gap-1 h-7 px-2 border-2 border-black text-black text-[10px] font-sans font-black uppercase tracking-widest hover:bg-accent hover:text-white hover:border-accent transition-colors"
+                  >
+                    <Sparkles size={12} strokeWidth={2.5} /> Analyse
+                  </button>
+                  <button
                     onClick={() => void remove(sp)}
                     aria-label="Remove from library"
                     className="p-1.5 border-2 border-black text-black hover:bg-red-600 hover:text-white hover:border-red-600 transition-colors"
@@ -199,6 +242,42 @@ export default function LibraryPage() {
           ))}
         </div>
       )}
+
+      {/* AI insight for a single paper */}
+      <AiResultModal
+        open={insightFor !== null}
+        onClose={() => setInsightFor(null)}
+        title="Paper Insight"
+        description={insightFor?.paper.title}
+        loading={insightLoading}
+        error={insightError}
+        aiAvailable={insightAiAvailable}
+        loadingLabel="Analysing against your thesis…"
+      >
+        {insight ? (
+          <>
+            <div>
+              <h4 className="text-[10px] font-sans font-black uppercase tracking-[0.2em] text-black/50 mb-2">Summary</h4>
+              <p className="text-sm font-sans text-black leading-relaxed">{insight.summary}</p>
+            </div>
+            <div>
+              <h4 className="text-[10px] font-sans font-black uppercase tracking-[0.2em] text-black/50 mb-2">
+                Relevance To Your Thesis
+              </h4>
+              <p className="text-sm font-sans text-black leading-relaxed">{insight.relevance}</p>
+            </div>
+            <AiList heading="Cite With Caution" items={insight.limitations} />
+            {insight.suggestedSection ? (
+              <div className="border-2 border-black bg-accent/5 p-3">
+                <p className="text-[10px] font-sans font-black uppercase tracking-widest text-black/50">
+                  Suggested placement
+                </p>
+                <p className="text-sm font-sans font-bold text-black mt-1">{insight.suggestedSection}</p>
+              </div>
+            ) : null}
+          </>
+        ) : null}
+      </AiResultModal>
     </div>
   );
 }

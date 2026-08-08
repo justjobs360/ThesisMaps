@@ -45,6 +45,13 @@ export default function AdminUserDetailPage({ params }: { params: { id: string }
     void refresh();
   }
 
+  async function handleSaveNotes(adminNotes: string) {
+    if (!user) return;
+    // Let errors propagate — the panel surfaces them next to the textarea.
+    await apiClient.patch(`/api/admin/users/${user.id}`, { adminNotes });
+    void refresh();
+  }
+
   async function handleDelete() {
     if (!user) return;
     if (!window.confirm('Delete this user and all their data? This cannot be undone.')) return;
@@ -74,7 +81,13 @@ export default function AdminUserDetailPage({ params }: { params: { id: string }
         ) : error || !user ? (
           <p className="text-sm font-sans text-danger">{error ?? 'User not found.'}</p>
         ) : (
-          <UserDetailPanel user={user} onSuspend={handleSuspend} onPromote={handlePromote} onDelete={handleDelete} />
+          <UserDetailPanel
+            user={user}
+            onSuspend={handleSuspend}
+            onPromote={handlePromote}
+            onDelete={handleDelete}
+            onSaveNotes={handleSaveNotes}
+          />
         )}
       </div>
     </div>

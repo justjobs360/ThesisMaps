@@ -11,10 +11,30 @@ type UserDetailPanelProps = {
   onSuspend?: () => void;
   onDelete?: () => void;
   onPromote?: () => void;
+  /** Persists the admin notes. Without this the textarea would silently discard edits. */
+  onSaveNotes?: (notes: string) => Promise<void>;
 };
 
-export function UserDetailPanel({ user, onSuspend, onDelete, onPromote }: UserDetailPanelProps) {
+export function UserDetailPanel({ user, onSuspend, onDelete, onPromote, onSaveNotes }: UserDetailPanelProps) {
   const [notes, setNotes] = useState(user.adminNotes ?? '');
+  const [savingNotes, setSavingNotes] = useState(false);
+  const [notesStatus, setNotesStatus] = useState<'idle' | 'saved' | 'error'>('idle');
+
+  const notesDirty = notes !== (user.adminNotes ?? '');
+
+  async function saveNotes() {
+    if (!onSaveNotes || savingNotes) return;
+    setSavingNotes(true);
+    setNotesStatus('idle');
+    try {
+      await onSaveNotes(notes);
+      setNotesStatus('saved');
+    } catch {
+      setNotesStatus('error');
+    } finally {
+      setSavingNotes(false);
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -55,17 +75,34 @@ export function UserDetailPanel({ user, onSuspend, onDelete, onPromote }: UserDe
       </div>
 
       <div>
-        <label htmlFor="admin-notes" className="block text-xs text-text-muted uppercase tracking-wide font-medium font-sans mb-2">
-          Admin Notes
-        </label>
+        <div className="flex items-center justify-between mb-2">
+          <label htmlFor="admin-notes" className="block text-xs text-text-muted uppercase tracking-wide font-medium font-sans">
+            Admin Notes
+          </label>
+          {notesStatus === 'saved' && !notesDirty ? (
+            <span className="text-[10px] font-sans font-black uppercase tracking-widest text-success">Saved</span>
+          ) : notesStatus === 'error' ? (
+            <span className="text-[10px] font-sans font-black uppercase tracking-widest text-danger">Save failed</span>
+          ) : null}
+        </div>
         <textarea
           id="admin-notes"
           value={notes}
-          onChange={(e) => setNotes(e.target.value)}
+          onChange={(e) => {
+            setNotes(e.target.value);
+            setNotesStatus('idle');
+          }}
           rows={3}
           className="w-full rounded border border-border bg-background px-3 py-2 text-sm font-sans text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-accent resize-none"
           placeholder="Internal notes about this user…"
         />
+        {onSaveNotes ? (
+          <div className="mt-2">
+            <Button size="sm" variant="secondary" onClick={saveNotes} loading={savingNotes} disabled={!notesDirty}>
+              Save Notes
+            </Button>
+          </div>
+        ) : null}
       </div>
 
       <div className="flex flex-wrap gap-2 pt-2 border-t border-border">

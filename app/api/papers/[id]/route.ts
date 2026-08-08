@@ -1,14 +1,25 @@
 import { NextResponse } from 'next/server';
+import { z } from 'zod';
+import { requireUser } from '@/lib/admin-guard';
 import { redis, cacheKey, CACHE_TTL } from '@/lib/redis';
 import { getPaperById } from '@/lib/api/semanticScholar';
 import type { Paper } from '@/types/paper';
 
-export async function GET(_request: Request, { params }: { params: { id: string } }) {
-  const { id } = params;
+const idSchema = z.string().min(1).max(200);
 
-  if (!id || id.length > 200) {
+export async function GET(request: Request, { params }: { params: { id: string } }) {
+  // Authed: proxies Semantic Scholar on our API key.
+  try {
+    await requireUser(request);
+  } catch {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  const parsed = idSchema.safeParse(params.id);
+  if (!parsed.success) {
     return NextResponse.json({ error: 'Invalid paper ID' }, { status: 400 });
   }
+  const id = parsed.data;
 
   const ck = cacheKey('paper', id);
 

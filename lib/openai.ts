@@ -4,9 +4,48 @@
 // built-in keyword heuristics produce generic/repetitive output.
 
 const OPENAI_URL = 'https://api.openai.com/v1/chat/completions';
+const EMBEDDINGS_URL = 'https://api.openai.com/v1/embeddings';
+
+// Matches the `papers.embedding vector(768)` column in supabase/schema.sql.
+// text-embedding-3-* supports native dimension reduction via the `dimensions`
+// parameter, so we request 768 directly and avoid migrating the column/index.
+export const EMBEDDING_DIMENSIONS = 768;
+const EMBEDDING_MODEL = 'text-embedding-3-small';
 
 export function hasOpenAI(): boolean {
   return Boolean(process.env.OPENAI_API_KEY?.trim());
+}
+
+/**
+ * Embeds one or more texts into 768-dimension vectors, preserving input order.
+ * Batch where possible — one call with N inputs is far cheaper than N calls.
+ */
+export async function embed(texts: string[]): Promise<number[][]> {
+  const key = process.env.OPENAI_API_KEY?.trim();
+  if (!key) throw new Error('OPENAI_API_KEY is not set');
+  if (texts.length === 0) return [];
+
+  const res = await fetch(EMBEDDINGS_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
+    body: JSON.stringify({
+      model: EMBEDDING_MODEL,
+      // The API rejects empty strings; keep positions stable with a placeholder.
+      input: texts.map((t) => t.trim() || 'untitled'),
+      dimensions: EMBEDDING_DIMENSIONS,
+    }),
+    signal: AbortSignal.timeout(30_000),
+  });
+
+  if (!res.ok) {
+    const detail = await res.text().catch(() => '');
+    throw new Error(`OpenAI embeddings ${res.status}: ${detail.slice(0, 300)}`);
+  }
+
+  const data = (await res.json()) as { data?: { index: number; embedding: number[] }[] };
+  const rows = data.data ?? [];
+  // The API may return results out of order — sort by index before mapping.
+  return [...rows].sort((a, b) => a.index - b.index).map((r) => r.embedding);
 }
 
 type ChatMessage = { role: 'system' | 'user' | 'assistant'; content: string };

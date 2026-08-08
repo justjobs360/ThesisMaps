@@ -16,8 +16,19 @@ type DefencePrep = {
   contradictions: QA[];
   methodologyCritiques: QA[];
   likelyQuestions: { question: string; answer: string }[];
+  checklist: string[];
 };
 
+/**
+ * Stable key for a checklist item. Checked state is persisted by this slug
+ * rather than by array position, because the AI-generated checklist changes
+ * between runs — positional storage would silently mark the wrong items.
+ */
+function itemKey(text: string): string {
+  return text.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 60);
+}
+
+// Used when no AI checklist is available (no key configured, or generation failed).
 const CHECKLIST = [
   'I can articulate my core argument in under 2 minutes',
   'I have addressed the most-cited counter-argument',
@@ -121,8 +132,12 @@ export default function DefencePage() {
   const [aiAvailable, setAiAvailable] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [checked, setChecked] = useState<boolean[]>(() => CHECKLIST.map(() => false));
+  // Keyed by item slug (see itemKey) so state survives checklist regeneration.
+  const [checked, setChecked] = useState<Record<string, boolean>>({});
   const [checklistSaved, setChecklistSaved] = useState(false);
+
+  // The AI-derived checklist when available, else the static fallback.
+  const checklistItems = prep?.checklist?.length ? prep.checklist : CHECKLIST;
 
   useEffect(() => {
     if (!projectId) return;
@@ -145,18 +160,29 @@ export default function DefencePage() {
       .finally(() => setLoading(false));
   }, [projectId]);
 
-  // Seed the checklist from the persisted project metadata once it loads.
+  // Seed checked state from persisted project metadata once it loads.
+  // Accepts both the current keyed shape and the legacy positional boolean[]
+  // (which was indexed against the old hard-coded CHECKLIST) so previously
+  // saved ticks aren't lost.
   useEffect(() => {
     const stored = currentProject?.metadata?.defenceChecklist;
+    if (!stored) return;
     if (Array.isArray(stored)) {
-      setChecked(CHECKLIST.map((_, i) => Boolean(stored[i])));
+      const migrated: Record<string, boolean> = {};
+      CHECKLIST.forEach((item, i) => {
+        if (stored[i]) migrated[itemKey(item)] = true;
+      });
+      setChecked(migrated);
+    } else if (typeof stored === 'object') {
+      setChecked(stored as Record<string, boolean>);
     }
   }, [currentProject]);
 
-  // Persist a checklist change to the project's metadata (fire-and-forget;
-  // local state stays authoritative so the UI never blocks on the round-trip).
-  async function toggleCheck(i: number) {
-    const next = checked.map((c, idx) => (idx === i ? !c : c));
+  // Persist a checklist change to the project's metadata. Local state stays
+  // authoritative so the UI never blocks on the round-trip.
+  async function toggleCheck(item: string) {
+    const key = itemKey(item);
+    const next = { ...checked, [key]: !checked[key] };
     setChecked(next);
     setChecklistSaved(false);
     if (!projectId) return;
@@ -279,24 +305,36 @@ export default function DefencePage() {
           <h2 id="checklist-heading" className="font-serif text-lg font-black uppercase tracking-tight text-black">
             Defence Checklist
           </h2>
-          {checklistSaved ? (
-            <span className="text-[10px] font-sans font-black uppercase tracking-widest text-success">Saved</span>
-          ) : null}
+          <div className="flex items-center gap-3">
+            {prep?.checklist?.length ? (
+              <span className="flex items-center gap-1 text-[10px] font-sans font-black uppercase tracking-widest text-accent">
+                <Sparkles size={11} strokeWidth={2.5} /> Tailored
+              </span>
+            ) : null}
+            {checklistSaved ? (
+              <span className="text-[10px] font-sans font-black uppercase tracking-widest text-success">Saved</span>
+            ) : null}
+          </div>
         </div>
         <ul className="space-y-3">
-          {CHECKLIST.map((item, i) => (
-            <li key={i} className="flex items-start gap-3">
-              <input
-                type="checkbox"
-                id={`check-${i}`}
-                checked={checked[i] ?? false}
-                onChange={() => void toggleCheck(i)}
-                className="mt-0.5 h-4 w-4 appearance-none border-2 border-black bg-white checked:bg-accent cursor-pointer flex-shrink-0"
-                aria-label={item}
-              />
-              <label htmlFor={`check-${i}`} className="text-[12px] font-sans font-bold text-black cursor-pointer">{item}</label>
-            </li>
-          ))}
+          {checklistItems.map((item) => {
+            const key = itemKey(item);
+            return (
+              <li key={key} className="flex items-start gap-3">
+                <input
+                  type="checkbox"
+                  id={`check-${key}`}
+                  checked={checked[key] ?? false}
+                  onChange={() => void toggleCheck(item)}
+                  className="mt-0.5 h-4 w-4 appearance-none border-2 border-black bg-white checked:bg-accent cursor-pointer flex-shrink-0"
+                  aria-label={item}
+                />
+                <label htmlFor={`check-${key}`} className="text-[12px] font-sans font-bold text-black cursor-pointer">
+                  {item}
+                </label>
+              </li>
+            );
+          })}
         </ul>
       </section>
     </div>

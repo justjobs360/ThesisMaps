@@ -1,4 +1,5 @@
 import { listSavedPapers } from '@/lib/repository/savedPapers';
+import { similarityPairs } from '@/lib/embeddings';
 import { getPaperReferences } from '@/lib/api/semanticScholar';
 import type { SavedPaper, Paper } from '@/types/paper';
 import type { GraphData, GraphNode, GraphEdge, NodeType } from '@/types/graph';
@@ -74,8 +75,25 @@ export async function buildProjectGraph(userId: string, projectId: string): Prom
     })
   );
 
-  // Fallback: field-of-study overlap so a fresh library still shows structure.
-  if (edges.length === 0 && nodes.length > 1) {
+  // Real semantic edges from embedding cosine similarity. Additive to citation
+  // edges — two papers can be both cited and topically close.
+  let semanticEdgeCount = 0;
+  if (nodes.length > 1) {
+    try {
+      const pairs = await similarityPairs(nodes.map((n) => n.id));
+      for (const pair of pairs) {
+        const before = edges.length;
+        addEdge(pair.a, pair.b, 'semantic_similarity', pair.similarity);
+        if (edges.length > before) semanticEdgeCount++;
+      }
+    } catch {
+      // Embeddings unavailable (no key, migration not applied) — fall through.
+    }
+  }
+
+  // Fallback: field-of-study overlap, so a library with no embeddings and no
+  // resolvable citations still shows structure rather than a scatter of dots.
+  if (edges.length === 0 && semanticEdgeCount === 0 && nodes.length > 1) {
     for (let i = 0; i < nodes.length; i++) {
       for (let j = i + 1; j < nodes.length; j++) {
         const a = new Set(nodes[i]!.paper.fieldsOfStudy);
