@@ -6,6 +6,7 @@ import {
 import { Button } from '@/components/ui/Button';
 import { WordCycler } from '@/components/ui/WordCycler';
 import { MarketingHeader } from '@/components/layout/MarketingHeader';
+import { ProductPreview } from '@/components/marketing/ProductPreview';
 import { MarketingFooter } from '@/components/layout/MarketingFooter';
 
 export const metadata: Metadata = {
@@ -35,24 +36,28 @@ const JSON_LD = JSON.stringify({
 const FEATURES = [
   {
     label: 'Knowledge Graph',
+    preview: 'graph' as const,
     heading: 'See how your literature connects',
     body: 'Visualise citation networks, semantic similarity, and co-authorship links across hundreds of papers — all on a single interactive canvas.',
     icon: GitFork,
   },
   {
     label: 'Outline Builder',
+    preview: 'outline' as const,
     heading: 'Structure your thesis with coverage scores',
     body: 'Drag papers into chapters, track coverage per section, and export a structured outline with citations to Word or PDF in one click.',
     icon: AlignLeft,
   },
   {
     label: 'Gap Detection',
+    preview: 'gaps' as const,
     heading: 'Find what nobody has written yet',
     body: 'Our ML-powered gap analysis clusters your library, scores topics by research density, and surfaces the questions your field has left unanswered.',
     icon: Lightbulb,
   },
   {
     label: 'Defence Readiness',
+    preview: 'defence' as const,
     heading: 'Prepare for the toughest questions',
     body: 'ThesisMaps surfaces counter-arguments, contradicting findings, and methodological critiques — then generates a defence checklist tailored to your thesis.',
     icon: Shield,
@@ -83,14 +88,16 @@ export default function LandingPage() {
           <div className="absolute top-0 left-0 w-full h-full -z-10 opacity-40 mix-blend-multiply pointer-events-none bg-[radial-gradient(circle_at_top_right,_var(--tw-gradient-stops))] from-accent/5 via-transparent to-transparent"></div>
           <p className="text-[10px] md:text-sm font-sans font-bold uppercase tracking-[0.3em] text-accent mb-8 leading-none">Visual Research Intelligence</p>
           <h1 id="hero-heading" className="font-serif text-[clamp(2.5rem,8vw,5.5rem)] text-text-primary mb-8 md:mb-12 leading-[1.1] tracking-tight">
-            The visual way to <br className="hidden md:block" />
-            <WordCycler 
-              words={['Map your literature', 'Find the gaps', 'Write with confidence']} 
-              className="italic font-light text-text-muted"
+            The visual way to … <br className="hidden md:block" />
+            {/* Lowercase + slightly smaller: the cycling phrase reads as a
+                continuation of the line above, not a new sentence. */}
+            <WordCycler
+              words={['map your literature', 'find the gaps', 'write with confidence']}
+              className="italic font-light text-text-muted text-[0.95em]"
             />
           </h1>
           <p className="max-w-2xl font-sans text-text-muted text-lg md:text-2xl leading-relaxed mb-12 md:mb-16">
-            Built exclusively for PhD candidates and researchers. Transform the painful process of literature reviews into an interactive, visual journey.
+            Built exclusively for MSc students, PhD candidates and researchers. Transform the painful process of literature reviews into an interactive, visual journey.
           </p>
           <div className="flex flex-col sm:flex-row items-start gap-6">
             <Link href="/signup" className="w-full sm:w-auto">
@@ -105,10 +112,10 @@ export default function LandingPage() {
             </Link>
           </div>
 
-          {/* Graph mockup placeholder */}
-          <div className="mt-16 md:mt-20 rounded-none overflow-hidden border-2 border-black shadow-impact bg-black h-64 md:h-96 flex items-center justify-center relative" aria-hidden>
-            <div className="absolute inset-0 opacity-20 bg-[radial-gradient(#ffffff_1px,transparent_1px)] [background-size:20px_20px]"></div>
-            <div className="text-white font-sans text-[10px] md:text-xs uppercase tracking-widest font-bold z-10 px-6">Knowledge Graph Engine Enabled</div>
+          {/* Live product preview. No border/fill: the graph should read as
+              floating on the page rather than sitting in a hard black box. */}
+          <div className="mt-12 md:mt-16 h-64 md:h-[26rem]">
+            <ProductPreview kind="graph" animated />
           </div>
         </section>
 
@@ -116,14 +123,18 @@ export default function LandingPage() {
         <section id="how-it-works" className="py-16 border-y-2 border-black bg-white" aria-labelledby="stages-heading">
           <div className="max-w-6xl mx-auto px-6">
             <p id="stages-heading" className="text-xs font-sans font-bold uppercase tracking-[0.2em] text-black text-center mb-8">Works across every thesis stage</p>
-            <ol className="flex flex-wrap justify-center gap-3">
+            {/* Grid rather than flex-wrap: flex sized each pill to its label, so
+                "DATA" was half the width of "METHODOLOGY". A grid makes all seven
+                identical at every breakpoint. Non-interactive by design, so no
+                hover state (it also can't be reached on touch). */}
+            <ol className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
               {STAGES.map((stage, i) => (
                 <li
                   key={stage}
-                  className="flex items-center gap-3 px-5 py-3 border-2 border-black bg-white font-sans text-sm font-bold text-black hover:bg-black hover:text-white transition-colors cursor-default"
+                  className="flex flex-col items-center justify-center gap-1 px-3 py-3 border-2 border-black bg-white font-sans text-center"
                 >
-                  <span className="text-accent text-xs">{(i + 1).toString().padStart(2, '0')}</span>
-                  {stage.toUpperCase()}
+                  <span className="text-accent text-[10px] font-bold">{(i + 1).toString().padStart(2, '0')}</span>
+                  <span className="text-[11px] md:text-xs font-bold text-black leading-tight">{stage.toUpperCase()}</span>
                 </li>
               ))}
             </ol>
@@ -138,11 +149,15 @@ export default function LandingPage() {
               const Icon = feature.icon;
               const reversed = i % 2 === 1;
               return (
+                // `md:items-stretch` so the text and visual columns share one
+                // height — `items-center` centred them against each other, and
+                // because the four bodies differ in length the misalignment was
+                // different in every row.
                 <div
                   key={feature.label}
-                  className={['flex flex-col md:flex-row items-center gap-12 md:gap-16', reversed ? 'md:flex-row-reverse' : ''].join(' ')}
+                  className={['flex flex-col md:flex-row md:items-stretch gap-10 md:gap-16', reversed ? 'md:flex-row-reverse' : ''].join(' ')}
                 >
-                  <div className="flex-1 w-full text-center md:text-left">
+                  <div className="w-full md:flex-1 flex flex-col justify-center text-center md:text-left">
                     <div className="flex items-center justify-center md:justify-start gap-3 mb-6">
                       <Icon size={20} strokeWidth={2} className="text-accent" aria-hidden />
                       <span className="text-[10px] md:text-sm font-sans font-bold uppercase tracking-[0.2em] text-accent">{feature.label}</span>
@@ -150,13 +165,11 @@ export default function LandingPage() {
                     <h3 className="font-serif text-2xl md:text-display-sm text-text-primary leading-tight mb-6">{feature.heading}</h3>
                     <p className="font-sans text-text-muted text-base md:text-lg leading-relaxed">{feature.body}</p>
                   </div>
-                  <div
-                    className="flex-1 border-2 border-black bg-black h-56 md:h-80 w-full flex items-center justify-center text-white/40 font-sans text-[10px] md:text-xs font-bold uppercase tracking-widest shadow-impact relative overflow-hidden"
-                    aria-label={`${feature.label} interface preview`}
-                    role="img"
-                  >
-                    <div className="absolute inset-0 opacity-10 bg-[radial-gradient(#ffffff_1px,transparent_1px)] [background-size:15px_15px]"></div>
-                    {feature.label} Engine
+                  {/* `w-full md:flex-1`, never a bare `flex-1`: on mobile the row is
+                      flex-col, where `flex-1` sets flex-basis:0 on the VERTICAL axis
+                      and overrides the height — collapsing this box to a ~15px strip. */}
+                  <div className="w-full md:flex-1 min-h-[14rem] md:min-h-[20rem] flex items-center justify-center">
+                    <ProductPreview kind={feature.preview} />
                   </div>
                 </div>
               );

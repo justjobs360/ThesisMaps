@@ -6,7 +6,7 @@ import { StageTracker } from '@/components/dashboard/StageTracker';
 import { StatCard } from '@/components/dashboard/StatCard';
 import { ResearchDebtPanel } from '@/components/dashboard/ResearchDebtPanel';
 import { useProject } from '@/hooks/useProject';
-import { THESIS_STAGES, type OutlineSection, type SeedSet } from '@/types/thesis';
+import { THESIS_STAGES, type OutlineSection, type SeedSet, type ThesisStage } from '@/types/thesis';
 import { analyseGaps } from '@/lib/gapAnalysis';
 import { apiClient } from '@/lib/apiClient';
 import { ArrowRight } from 'lucide-react';
@@ -28,11 +28,13 @@ const METHOD_BUCKETS: { label: string; re: RegExp }[] = [
 ];
 
 export default function DashboardPage() {
-  const { currentProject, projectId, loading } = useProject();
+  const { currentProject, projectId, loading, refresh } = useProject();
   const [saved, setSaved] = useState<SavedPaper[]>([]);
   const [sections, setSections] = useState<OutlineSection[]>([]);
   const [seedSets, setSeedSets] = useState<SeedSet[]>([]);
   const [dataLoading, setDataLoading] = useState(true);
+  const [stageSaving, setStageSaving] = useState(false);
+  const [stageError, setStageError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!projectId) return;
@@ -53,6 +55,23 @@ export default function DashboardPage() {
       cancelled = true;
     };
   }, [projectId]);
+
+  // Move the project to another research stage. Persists to thesis_projects via
+  // PATCH /api/projects/[id], then refreshes the shared project context so the
+  // dashboard header and Settings both reflect the new stage.
+  async function handleStageChange(next: ThesisStage) {
+    if (!projectId || stageSaving || next === currentProject?.currentStage) return;
+    setStageSaving(true);
+    setStageError(null);
+    try {
+      await apiClient.patch(`/api/projects/${projectId}`, { currentStage: next });
+      await refresh();
+    } catch (err) {
+      setStageError(err instanceof Error ? err.message : 'Could not change stage.');
+    } finally {
+      setStageSaving(false);
+    }
+  }
 
   const title = currentProject?.title ?? 'My Thesis';
   const stage = currentProject?.currentStage ?? 'research_proposal';
@@ -77,7 +96,10 @@ export default function DashboardPage() {
         subtitle={`Current stage: ${stageLabel} · ${field}`}
       />
 
-      <StageTracker currentStage={stage} />
+      <StageTracker currentStage={stage} onStageClick={handleStageChange} saving={stageSaving} />
+      {stageError ? (
+        <p className="text-[10px] font-sans font-black uppercase tracking-widest text-red-600">{stageError}</p>
+      ) : null}
 
       {/* Stats */}
       <section aria-labelledby="stats-heading">

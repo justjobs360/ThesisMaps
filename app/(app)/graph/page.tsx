@@ -14,7 +14,11 @@ export default function GraphPage() {
   const isEmpty = !loading && graphData.nodes.length === 0;
 
   return (
-    <div className="flex flex-col h-[calc(100vh-64px-72px)] -m-6 md:-m-12">
+    // `app-full-bleed` (globals.css) escapes the shell's max-w-6xl clamp so the
+    // canvas spans the content area instead of sitting in white gutters.
+    // Height subtracts only the 72px footer — the 64px topbar is already handled
+    // by the shell's pt-[64px], and subtracting it here too made the canvas short.
+    <div className="flex flex-col h-[calc(100vh-72px)] -my-6 md:-my-12 app-full-bleed">
       <div className="px-6 md:px-12 py-4 border-b-2 border-black bg-white flex-shrink-0">
         <PageHeader title="Knowledge Graph" subtitle="Explore citation networks and semantic connections across your library." />
       </div>

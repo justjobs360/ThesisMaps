@@ -38,11 +38,11 @@ export function SignupChart({ data = [] }: { data?: DataPoint[] }) {
       ) : (
         <ResponsiveContainer width="100%" height={200}>
           <LineChart data={data.map((d) => ({ name: d.label, value: d.value }))}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#E7E2D9" />
-            <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#78716C' }} />
-            <YAxis tick={{ fontSize: 11, fill: '#78716C' }} allowDecimals={false} />
+            <CartesianGrid strokeDasharray="3 3" stroke="#D4D4D4" />
+            <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#666666' }} />
+            <YAxis tick={{ fontSize: 11, fill: '#666666' }} allowDecimals={false} />
             <Tooltip contentStyle={{ fontSize: 12 }} />
-            <Line type="monotone" dataKey="value" stroke="#C4973A" strokeWidth={2} dot={false} />
+            <Line type="monotone" dataKey="value" stroke="#0066FF" strokeWidth={2} dot={false} />
           </LineChart>
         </ResponsiveContainer>
       )}
@@ -58,11 +58,11 @@ export function DauChart({ data = [] }: { data?: DataPoint[] }) {
       ) : (
         <ResponsiveContainer width="100%" height={200}>
           <AreaChart data={data.map((d) => ({ name: d.label, value: d.value }))}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#E7E2D9" />
-            <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#78716C' }} />
-            <YAxis tick={{ fontSize: 11, fill: '#78716C' }} allowDecimals={false} />
+            <CartesianGrid strokeDasharray="3 3" stroke="#D4D4D4" />
+            <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#666666' }} />
+            <YAxis tick={{ fontSize: 11, fill: '#666666' }} allowDecimals={false} />
             <Tooltip contentStyle={{ fontSize: 12 }} />
-            <Area type="monotone" dataKey="value" stroke="#C4973A" fill="#C4973A22" strokeWidth={2} />
+            <Area type="monotone" dataKey="value" stroke="#0066FF" fill="#0066FF1A" strokeWidth={2} />
           </AreaChart>
         </ResponsiveContainer>
       )}
@@ -78,11 +78,11 @@ export function TopQueriesChart({ data = [] }: { data?: DataPoint[] }) {
       ) : (
         <ResponsiveContainer width="100%" height={200}>
           <BarChart data={data.map((d) => ({ name: d.label, value: d.value }))} layout="vertical">
-            <CartesianGrid strokeDasharray="3 3" stroke="#E7E2D9" horizontal={false} />
-            <XAxis type="number" tick={{ fontSize: 11, fill: '#78716C' }} allowDecimals={false} />
-            <YAxis dataKey="name" type="category" width={140} tick={{ fontSize: 11, fill: '#78716C' }} />
+            <CartesianGrid strokeDasharray="3 3" stroke="#D4D4D4" horizontal={false} />
+            <XAxis type="number" tick={{ fontSize: 11, fill: '#666666' }} allowDecimals={false} />
+            <YAxis dataKey="name" type="category" width={140} tick={{ fontSize: 11, fill: '#666666' }} />
             <Tooltip contentStyle={{ fontSize: 12 }} />
-            <Bar dataKey="value" fill="#C4973A" radius={[0, 4, 4, 0]} />
+            <Bar dataKey="value" fill="#0066FF" radius={[0, 0, 0, 0]} />
           </BarChart>
         </ResponsiveContainer>
       )}

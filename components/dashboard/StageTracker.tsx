@@ -7,15 +7,30 @@ import { Tooltip } from '@/components/ui/Tooltip';
 
 type StageTrackerProps = {
   currentStage: ThesisStage;
+  /** When provided, steps become clickable to move the project to that stage. */
   onStageClick?: (stage: ThesisStage) => void;
+  /** Shows a saving indicator and blocks further clicks while persisting. */
+  saving?: boolean;
 };
 
-export function StageTracker({ currentStage, onStageClick }: StageTrackerProps) {
+export function StageTracker({ currentStage, onStageClick, saving = false }: StageTrackerProps) {
   const currentIndex = THESIS_STAGES.findIndex((s) => s.id === currentStage);
+  const interactive = Boolean(onStageClick);
 
   return (
     <nav aria-label="Thesis progress" className="bg-surface border border-border rounded-md p-5 shadow-sm">
-      <p className="text-xs font-sans font-medium text-text-muted uppercase tracking-wide mb-4">Research Stage</p>
+      <div className="flex items-center justify-between mb-4">
+        <p className="text-xs font-sans font-medium text-text-muted uppercase tracking-wide">Research Stage</p>
+        {saving ? (
+          <span className="text-[10px] font-sans font-black uppercase tracking-widest text-accent animate-pulse">
+            Saving…
+          </span>
+        ) : interactive ? (
+          <span className="text-[10px] font-sans font-medium uppercase tracking-widest text-text-muted hidden sm:block">
+            Click a step to change stage
+          </span>
+        ) : null}
+      </div>
       <ol className="flex items-center gap-0">
         {THESIS_STAGES.map((stage, index) => {
           const isCompleted = index < currentIndex;
@@ -25,16 +40,28 @@ export function StageTracker({ currentStage, onStageClick }: StageTrackerProps) 
           return (
             <React.Fragment key={stage.id}>
               <li className="flex flex-col items-center gap-2">
-                <Tooltip content={stage.label} side="top">
+                <Tooltip
+                  content={
+                    interactive && !isCurrent ? `Set stage to ${stage.label}` : stage.label
+                  }
+                  side="top"
+                >
                   <button
                     onClick={() => onStageClick?.(stage.id)}
+                    disabled={!interactive || saving || isCurrent}
                     aria-current={isCurrent ? 'step' : undefined}
-                    aria-label={`${stage.label}${isCompleted ? ' (completed)' : isCurrent ? ' (current)' : ''}`}
+                    aria-label={`${stage.label}${isCompleted ? ' (completed)' : isCurrent ? ' (current)' : ''}${
+                      interactive && !isCurrent ? ' — click to set as current stage' : ''
+                    }`}
                     className={[
-                      'w-8 h-8 rounded-full flex items-center justify-center text-xs font-sans font-medium transition-colors duration-150',
+                      'w-8 h-8 rounded-full flex items-center justify-center text-xs font-sans font-medium transition-all duration-150',
                       isCompleted ? 'bg-success text-white' : '',
-                      isCurrent ? 'bg-accent text-white ring-4 ring-accent/20' : '',
+                      isCurrent ? 'bg-accent text-white ring-4 ring-accent/20 cursor-default' : '',
                       isUpcoming ? 'bg-background border-2 border-border text-text-muted' : '',
+                      interactive && !isCurrent && !saving
+                        ? 'cursor-pointer hover:ring-4 hover:ring-accent/30 hover:border-accent'
+                        : '',
+                      saving ? 'opacity-60' : '',
                     ].join(' ')}
                   >
                     {isCompleted ? <Check size={14} strokeWidth={2} /> : index + 1}

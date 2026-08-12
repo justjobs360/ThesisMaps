@@ -5,6 +5,7 @@ import { Search, Bell, ChevronRight, Menu } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useSidebar } from '@/context/SidebarContext';
 import { Dropdown } from '@/components/ui/Dropdown';
+import { ProjectSwitcher } from '@/components/layout/ProjectSwitcher';
 
 const ROUTE_LABELS: Record<string, string> = {
   '/dashboard': 'Dashboard',
@@ -35,7 +36,10 @@ export function Topbar() {
 
   return (
     <header className="fixed top-0 left-0 lg:left-[220px] right-0 h-[64px] bg-white border-b-2 border-black z-20">
-      <div className="max-w-5xl mx-auto h-full flex items-center px-4 md:px-6 gap-3 md:gap-6">
+      {/* max-w-6xl to match the content wrapper in app/(app)/layout.tsx — it was
+          max-w-5xl, which left the topbar narrower than the page beneath it and
+          crowded the project switcher. */}
+      <div className="max-w-6xl mx-auto h-full flex items-center px-4 md:px-6 gap-3 md:gap-4">
         <button
           onClick={toggle}
           className="lg:hidden p-2 border-2 border-black hover:bg-black hover:text-white transition-colors"
@@ -44,15 +48,23 @@ export function Topbar() {
           <Menu size={20} strokeWidth={2.5} />
         </button>
 
-        <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-[10px] md:text-xs font-sans font-bold uppercase tracking-wider text-text-muted flex-1 min-w-0">
-          <span className="text-black hidden sm:inline">ThesisMaps</span>
-          <ChevronRight size={14} strokeWidth={2.5} className="text-black hidden sm:inline" />
-          <span className="text-accent underline underline-offset-4 truncate">{pageLabel}</span>
-        </nav>
+        {/* Active project + switcher, then the current page. */}
+        <div className="flex items-center gap-2 md:gap-3 flex-1 min-w-0">
+          <ProjectSwitcher />
+          <nav
+            aria-label="Breadcrumb"
+            className="flex items-center gap-2 text-[10px] md:text-xs font-sans font-bold uppercase tracking-wider text-text-muted min-w-0"
+          >
+            <ChevronRight size={14} strokeWidth={2.5} className="text-black hidden sm:inline flex-shrink-0" />
+            <span className="text-accent underline underline-offset-4 truncate">{pageLabel}</span>
+          </nav>
+        </div>
 
         <div className="flex items-center gap-3">
           <button
-            aria-label="Search"
+            onClick={() => router.push('/search')}
+            aria-label="Search papers"
+            title="Search papers"
             className="p-2 border border-transparent hover:border-black transition-colors"
           >
             <Search size={18} strokeWidth={2} />

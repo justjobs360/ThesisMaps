@@ -27,13 +27,66 @@
     letter-spacing: -0.01em;
   }
 
-  /* React Flow overrides */
-  .react-flow__renderer {
-    background: #0D1117;
+  /* React Flow inherits the canvas colour from the `graph-bg` token via the
+     wrapper (see components/graph/KnowledgeGraph.tsx). A hardcoded dark
+     background used to live here and silently overrode that token, keeping a
+     populated graph dark even after the canvas went white. */
+}
+
+/**
+ * Marketing graph preview motion (components/marketing/ProductPreview.tsx).
+ * Nodes drift on small independent orbits; edges are drawn centre-to-centre and
+ * painted UNDER the nodes, so a few px of drift never detaches a line visually.
+ * Per-node variation comes from CSS custom properties rather than extra classes.
+ */
+@keyframes tm-drift {
+  from { transform: translate(0, 0); }
+  to   { transform: translate(var(--tm-dx, 6px), var(--tm-dy, -5px)); }
+}
+
+@keyframes tm-pulse {
+  0%, 100% { opacity: 0.25; }
+  50%      { opacity: 0.6; }
+}
+
+.tm-drift {
+  animation: tm-drift var(--tm-dur, 18s) ease-in-out infinite alternate;
+  animation-delay: var(--tm-delay, 0s);
+}
+
+.tm-pulse {
+  animation: tm-pulse var(--tm-dur, 7s) ease-in-out infinite;
+  animation-delay: var(--tm-delay, 0s);
+}
+
+/* Respect the OS setting — hold the scene completely still. */
+@media (prefers-reduced-motion: reduce) {
+  .tm-drift,
+  .tm-pulse {
+    animation: none !important;
   }
 }
 
 @layer utilities {
+  /**
+   * Escapes the app shell's `max-w-6xl mx-auto` clamp (app/(app)/layout.tsx) so a
+   * canvas can span the full content area beside the 220px sidebar. Used by the
+   * knowledge graph, which was otherwise letterboxed by white gutters on wide
+   * screens. Below `lg` the sidebar is hidden, so the offset is 0.
+   */
+  .app-full-bleed {
+    width: 100vw;
+    max-width: 100vw;
+    margin-left: calc(50% - 50vw);
+  }
+  @media (min-width: 1024px) {
+    .app-full-bleed {
+      width: calc(100vw - 220px);
+      max-width: calc(100vw - 220px);
+      margin-left: calc(50% - (100vw - 220px) / 2);
+    }
+  }
+
   .line-clamp-2 {
     display: -webkit-box;
     -webkit-line-clamp: 2;
