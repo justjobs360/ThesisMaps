@@ -74,7 +74,10 @@ export default function SeedsPage() {
   }
 
   return (
-    <div className="flex flex-col lg:flex-row gap-8 h-full max-w-6xl mx-auto">
+    // Definite height, not h-full: the shell wrapper only sets min-h-*, so a
+    // percentage height had nothing to resolve against and the flex-1 panes
+    // inside never got a real box to scroll within.
+    <div className="flex flex-col lg:flex-row gap-8 h-[calc(100vh-72px)] -my-6 md:-my-12 py-6 md:py-12">
       {/* Sidebar */}
       <aside className="w-full lg:w-72 flex-shrink-0 bg-white border-2 border-black flex flex-col shadow-impact" aria-label="Seed sets">
         <div className="p-4 border-b-2 border-black flex items-center justify-between bg-black">

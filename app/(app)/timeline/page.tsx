@@ -67,37 +67,42 @@ export default function TimelinePage() {
   const yearTicks = Array.from({ length: range + 1 }, (_, i) => minYear + i);
 
   return (
-    <div className="space-y-6 max-w-6xl">
-      <PageHeader
-        title="Literature Timeline"
-        subtitle="Visualise how research in your saved library has evolved over time."
-        action={<ExportMenu formats={['bibtex', 'csv', 'json']} />}
-      />
+    // Fills the viewport instead of collapsing to the plot's content height (a
+    // single-lane plot is only ~110px). Subtract just the 72px footer — the
+    // shell already offsets the 64px topbar with pt-[64px].
+    <div className="flex flex-col h-[calc(100vh-72px)] -my-6 md:-my-12 py-6 md:py-12 gap-6">
+      <div className="flex-shrink-0">
+        <PageHeader
+          title="Literature Timeline"
+          subtitle="Visualise how research in your saved library has evolved over time."
+          action={<ExportMenu formats={['bibtex', 'csv', 'json']} />}
+        />
+      </div>
 
       {loading ? (
-        <div className="bg-white border-2 border-black shadow-impact p-6">
+        <div className="flex-1 bg-white border-2 border-black shadow-impact p-6">
           <Skeleton className="h-40 w-full" />
         </div>
       ) : error ? (
-        <div className="bg-white border-2 border-black shadow-impact p-6">
+        <div className="flex-1 bg-white border-2 border-black shadow-impact p-6">
           <p className="text-[10px] text-red-600 font-black uppercase tracking-widest">Failed to load timeline</p>
           <p className="text-xs text-black/40 font-sans mt-1">{error}</p>
         </div>
       ) : papers.length === 0 ? (
-        <div className="text-center py-24 border-2 border-black border-dashed bg-white">
+        <div className="flex-1 flex flex-col items-center justify-center text-center border-2 border-black border-dashed bg-white">
           <p className="text-black/40 font-sans font-bold uppercase tracking-[0.2em] text-[10px]">No papers in your library yet</p>
           <p className="text-black/40 font-sans text-xs mt-2">Save papers from Search — they will be plotted here by year.</p>
         </div>
       ) : (
-        <div className="bg-white border-2 border-black shadow-impact">
-          <div className="flex items-center justify-between px-6 py-3 border-b-2 border-black">
+        <div className="flex-1 min-h-0 flex flex-col bg-white border-2 border-black shadow-impact">
+          <div className="flex items-center justify-between px-6 py-3 border-b-2 border-black flex-shrink-0">
             <p className="text-[10px] font-sans font-black uppercase tracking-widest text-black/50">
               {papers.length} paper{papers.length === 1 ? '' : 's'} · {minYear}–{maxYear}
             </p>
             <p className="text-[10px] font-sans font-bold uppercase tracking-widest text-black/30">Scroll horizontally →</p>
           </div>
 
-          <div className="overflow-x-auto p-6">
+          <div className="flex-1 min-h-0 overflow-auto p-6">
             <div className="relative" style={{ width: plotWidth, height: plotHeight }}>
               {/* Per-year gridlines + labels (every year in range) */}
               {yearTicks.map((y) => {

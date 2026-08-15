@@ -31,6 +31,25 @@
      wrapper (see components/graph/KnowledgeGraph.tsx). A hardcoded dark
      background used to live here and silently overrode that token, keeping a
      populated graph dark even after the canvas went white. */
+
+  /**
+   * Stops the whole page jumping sideways whenever a Radix dropdown, dialog or
+   * select opens.
+   *
+   * Those primitives wrap their content in react-remove-scroll, which locks the
+   * body and injects `body[data-scroll-locked] { margin-right: <scrollbar>px }`
+   * to compensate for the scrollbar it just removed. But `scrollbar-gutter:
+   * stable` above keeps that gutter reserved, so nothing is actually freed and
+   * the margin is pure width loss — every `mx-auto` block re-centres in a
+   * narrower body and visibly shifts left, while the fixed topbar stays put.
+   *
+   * `html body[...]` rather than `body[...]`: react-remove-scroll injects its
+   * rule into <head> at runtime, so it lands after this stylesheet and would win
+   * a specificity tie. The extra element selector wins regardless of order.
+   */
+  html body[data-scroll-locked] {
+    margin-right: 0 !important;
+  }
 }
 
 /**

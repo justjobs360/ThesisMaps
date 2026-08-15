@@ -112,10 +112,10 @@ export default function LandingPage() {
             </Link>
           </div>
 
-          {/* Live product preview. No border/fill: the graph should read as
-              floating on the page rather than sitting in a hard black box. */}
+          {/* Live product preview: dark canvas, ambient drift, and draggable
+              paper nodes — the same interaction the real graph offers. */}
           <div className="mt-12 md:mt-16 h-64 md:h-[26rem]">
-            <ProductPreview kind="graph" animated />
+            <ProductPreview kind="graph" animated interactive />
           </div>
         </section>
 
@@ -168,8 +168,12 @@ export default function LandingPage() {
                   {/* `w-full md:flex-1`, never a bare `flex-1`: on mobile the row is
                       flex-col, where `flex-1` sets flex-basis:0 on the VERTICAL axis
                       and overrides the height — collapsing this box to a ~15px strip. */}
-                  <div className="w-full md:flex-1 min-h-[14rem] md:min-h-[20rem] flex items-center justify-center">
-                    <ProductPreview kind={feature.preview} />
+                  {/* Definite height, not min-h + items-center: the frame is
+                      `h-full`, and min-height only sets a floor while
+                      items-center sizes a flex child to its content — so the
+                      dark box shrank to fit instead of filling. */}
+                  <div className="w-full md:flex-1 h-56 md:h-80">
+                    <ProductPreview kind={feature.preview} interactive />
                   </div>
                 </div>
               );

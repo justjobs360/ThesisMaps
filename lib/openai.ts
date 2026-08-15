@@ -3,6 +3,8 @@
 // server). Used to generate personalized, paper-grounded analysis where the
 // built-in keyword heuristics produce generic/repetitive output.
 
+import { AI_VOICE } from '@/lib/aiVoice';
+
 const OPENAI_URL = 'https://api.openai.com/v1/chat/completions';
 const EMBEDDINGS_URL = 'https://api.openai.com/v1/embeddings';
 
@@ -55,6 +57,8 @@ type ChatOptions = {
   temperature?: number; // only applied to non-reasoning models
   reasoningEffort?: 'minimal' | 'low' | 'medium' | 'high'; // reasoning models only
   maxTokens?: number; // maps to max_completion_tokens (includes reasoning tokens)
+  /** Set false to skip the shared house-style instruction (defaults to on). */
+  voice?: boolean;
 };
 
 // GPT-5 / o-series are reasoning models: they require `max_completion_tokens`
@@ -64,12 +68,24 @@ function isReasoningModel(model: string): boolean {
   return /^(gpt-5|o\d)/.test(model);
 }
 
-/** Calls OpenAI chat completions and returns the raw message content string. */
+/**
+ * Calls OpenAI chat completions and returns the raw message content string.
+ *
+ * Every generation in the app funnels through here, so the shared writing voice
+ * is prepended once rather than repeated in each route. It goes FIRST so each
+ * caller's persona and its `Respond ONLY with a JSON object…` schema clause stay
+ * last, where recency helps the model honour the shape.
+ *
+ * Pass `voice: false` for calls where house style is irrelevant.
+ */
 export async function chat(messages: ChatMessage[], opts: ChatOptions = {}): Promise<string> {
   const key = process.env.OPENAI_API_KEY?.trim();
   if (!key) throw new Error('OPENAI_API_KEY is not set');
   const model = process.env.OPENAI_MODEL?.trim() || 'gpt-5.4-mini';
   const reasoning = isReasoningModel(model);
+
+  const payload: ChatMessage[] =
+    opts.voice === false ? messages : [{ role: 'system', content: AI_VOICE }, ...messages];
 
   const res = await fetch(OPENAI_URL, {
     method: 'POST',
@@ -79,7 +95,7 @@ export async function chat(messages: ChatMessage[], opts: ChatOptions = {}): Pro
     },
     body: JSON.stringify({
       model,
-      messages,
+      messages: payload,
       max_completion_tokens: opts.maxTokens ?? 3000,
       ...(reasoning
         ? { reasoning_effort: opts.reasoningEffort ?? 'low' }
