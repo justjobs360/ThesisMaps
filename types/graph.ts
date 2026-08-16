@@ -26,10 +26,20 @@ export type GraphData = {
   edges: GraphEdge[];
 };
 
-export type HeatmapMode = 'type' | 'recency' | 'citation' | 'relevance';
+export type HeatmapMode = 'type' | 'year' | 'recency' | 'citation' | 'relevance';
 
-export type GraphControls = {
-  zoom: number;
-  showMinimap: boolean;
-  heatmapMode: HeatmapMode;
-};
+/**
+ * What drives node radius.
+ * - `citations`   global citation count — how important the paper is to the field
+ * - `connections` in-graph degree — how connected it is *within this library*, which
+ *                 is a different question: a famous paper can be globally huge but
+ *                 linked to only one other paper the user has actually saved
+ * - `uniform`     every node the same size
+ */
+export type NodeSizeMode = 'citations' | 'connections' | 'uniform';
+
+/**
+ * - `cluster`  free force layout; position carries no meaning beyond relatedness
+ * - `timeline` x-axis pinned to publication year, y relaxed by the simulation
+ */
+export type GraphViewMode = 'cluster' | 'timeline';

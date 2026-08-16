@@ -5,14 +5,14 @@ import React, { useCallback, useRef, useState } from 'react';
 /**
  * Honest, dependency-free previews of the product for the marketing page.
  *
- * Geometry and colour are lifted from the real components so the preview can't
- * drift from the product: nodes are 180x70 white rects with a 4px left accent bar
- * (components/graph/PaperNode.tsx), the palette is components/graph/nodeColor.ts,
- * and the edge styling matches components/graph/EdgeTypes.tsx.
+ * The graph preview mirrors the real knowledge graph: circles sized by citation
+ * count, straight centre-to-centre links, and hover-to-isolate. Colour and edge
+ * styling come from components/graph/nodeColor.ts and EdgeTypes.tsx so the two
+ * can't drift apart.
  *
- * Deliberately plain SVG/divs rather than ReactFlow or d3 — the marketing route
- * must stay light. Ambient motion is CSS-only (.tm-drift/.tm-pulse in globals.css,
- * which honour prefers-reduced-motion); dragging is a few lines of pointer maths.
+ * Deliberately plain SVG rather than ReactFlow or d3 — the marketing route must
+ * stay light. Ambient motion is CSS-only (.tm-drift/.tm-pulse in globals.css,
+ * which honour prefers-reduced-motion); drag and hover are a few lines each.
  */
 
 // components/graph/nodeColor.ts
@@ -24,10 +24,10 @@ const CITED = '#94A3B8';
 const EDGE_CITATION = '#64748B';
 const EDGE_SEMANTIC = '#0066FF';
 
-const NODE_W = 180;
-const NODE_H = 70;
 const VIEW_W = 1160;
 const VIEW_H = 380;
+const MIN_R = 16;
+const MAX_R = 46;
 
 type PreviewNode = {
   id: string;
@@ -35,7 +35,8 @@ type PreviewNode = {
   y: number;
   accent: string;
   title: string;
-  meta: string;
+  year: number;
+  citations: number;
   /** Ambient drift offset + timing, so each node moves independently. */
   dx: number;
   dy: number;
@@ -44,13 +45,13 @@ type PreviewNode = {
 };
 
 const NODES: PreviewNode[] = [
-  { id: 'a', x: 40,  y: 40,  accent: SEED,        title: 'Attention Is All You Need',  meta: '2017 · 112k cit.', dx: 7,  dy: -6, dur: 19, delay: 0 },
-  { id: 'b', x: 330, y: 20,  accent: CITED,       title: 'Neural Machine Translation', meta: '2015 · 24k cit.',  dx: -6, dy: 7,  dur: 23, delay: 1.5 },
-  { id: 'c', x: 320, y: 165, accent: INFLUENTIAL, title: 'Deep Residual Learning',     meta: '2016 · 210k cit.', dx: 6,  dy: 6,  dur: 21, delay: 0.8 },
-  { id: 'd', x: 620, y: 75,  accent: CITING,      title: 'BERT: Pre-training',         meta: '2019 · 88k cit.',  dx: -7, dy: -5, dur: 25, delay: 2.2 },
-  { id: 'e', x: 600, y: 250, accent: CITED,       title: 'Low-Resource NMT Survey',    meta: '2021 · 1.4k cit.', dx: 5,  dy: -7, dur: 20, delay: 1.1 },
-  { id: 'f', x: 900, y: 30,  accent: SEED,        title: 'Scaling Laws for LMs',       meta: '2020 · 6.2k cit.', dx: -5, dy: 6,  dur: 24, delay: 0.4 },
-  { id: 'g', x: 890, y: 195, accent: CITING,      title: 'Transformer Variants',       meta: '2022 · 900 cit.',  dx: 6,  dy: 5,  dur: 22, delay: 1.9 },
+  { id: 'a', x: 110, y: 105, accent: SEED,        title: 'Attention Is All You Need',  year: 2017, citations: 112000, dx: 7,  dy: -6, dur: 19, delay: 0 },
+  { id: 'b', x: 360, y: 60,  accent: CITED,       title: 'Neural Machine Translation', year: 2015, citations: 24000,  dx: -6, dy: 7,  dur: 23, delay: 1.5 },
+  { id: 'c', x: 380, y: 240, accent: INFLUENTIAL, title: 'Deep Residual Learning',     year: 2016, citations: 210000, dx: 6,  dy: 6,  dur: 21, delay: 0.8 },
+  { id: 'd', x: 650, y: 140, accent: CITING,      title: 'BERT: Pre-training',         year: 2019, citations: 88000,  dx: -7, dy: -5, dur: 25, delay: 2.2 },
+  { id: 'e', x: 700, y: 300, accent: CITED,       title: 'Low-Resource NMT Survey',    year: 2021, citations: 1400,   dx: 5,  dy: -7, dur: 20, delay: 1.1 },
+  { id: 'f', x: 950, y: 90,  accent: SEED,        title: 'Scaling Laws for LMs',       year: 2020, citations: 6200,   dx: -5, dy: 6,  dur: 24, delay: 0.4 },
+  { id: 'g', x: 960, y: 265, accent: CITING,      title: 'Transformer Variants',       year: 2022, citations: 900,    dx: 6,  dy: 5,  dur: 22, delay: 1.9 },
 ];
 
 type PreviewEdge = { from: string; to: string; semantic?: boolean };
@@ -70,19 +71,26 @@ type Point = { x: number; y: number };
 
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
 
-/** Horizontal cubic bezier, matching ReactFlow's default edge shape. */
-function edgePath(a: Point, b: Point): string {
-  const x1 = a.x + NODE_W / 2;
-  const y1 = a.y + NODE_H / 2;
-  const x2 = b.x + NODE_W / 2;
-  const y2 = b.y + NODE_H / 2;
-  const dx = Math.max(40, Math.abs(x2 - x1) / 2);
-  return `M ${x1} ${y1} C ${x1 + dx} ${y1}, ${x2 - dx} ${y2}, ${x2} ${y2}`;
+// Area tracks citations, same sqrt encoding as components/graph/nodeSize.ts.
+const MAX_CITATIONS = Math.max(...NODES.map((n) => n.citations));
+const radiusOf = (citations: number) =>
+  MIN_R + (Math.sqrt(citations) / Math.sqrt(MAX_CITATIONS)) * (MAX_R - MIN_R);
+
+const shortCount = (n: number) => (n >= 1000 ? `${Math.round(n / 1000)}k` : `${n}`);
+
+/** Direct neighbours of a node, for hover isolation. */
+function neighboursOf(id: string): Set<string> {
+  const set = new Set<string>([id]);
+  for (const e of EDGES) {
+    if (e.from === id) set.add(e.to);
+    if (e.to === id) set.add(e.from);
+  }
+  return set;
 }
 
 /**
- * Dark frame shared by every preview, so the white cards inside read as product
- * UI sitting on the graph canvas.
+ * Dark frame shared by every preview, so the content inside reads as product UI
+ * sitting on a canvas.
  */
 function PreviewFrame({
   children,
@@ -99,7 +107,6 @@ function PreviewFrame({
       role="img"
       aria-label={label}
     >
-      {/* Same dot grid as the product's graph canvas background. */}
       <div
         className="absolute inset-0 opacity-20 bg-[radial-gradient(#ffffff_1px,transparent_1px)] [background-size:20px_20px]"
         aria-hidden
@@ -119,10 +126,13 @@ function GraphPreview({ animated, interactive }: { animated: boolean; interactiv
   const [positions, setPositions] = useState<Record<string, Point>>(() =>
     Object.fromEntries(NODES.map((n) => [n.id, { x: n.x, y: n.y }]))
   );
-  // Nodes the user has grabbed stop drifting — their position is now user-owned,
-  // otherwise the CSS animation would fight the drag.
+  // Grabbed nodes stop drifting — position becomes user-owned, so the CSS
+  // animation doesn't fight the drag.
   const [grabbed, setGrabbed] = useState<Set<string>>(() => new Set());
+  const [hovered, setHovered] = useState<string | null>(null);
   const drag = useRef<{ id: string; startX: number; startY: number; origin: Point } | null>(null);
+
+  const active = hovered ? neighboursOf(hovered) : null;
 
   /** viewBox units per screen pixel, so dragging tracks the cursor at any size. */
   const unitsPerPixel = useCallback(() => {
@@ -149,8 +159,9 @@ function GraphPreview({ animated, interactive }: { animated: boolean; interactiv
       const d = drag.current;
       if (!d) return;
       const scale = unitsPerPixel();
-      const x = clamp(d.origin.x + (e.clientX - d.startX) * scale, 0, VIEW_W - NODE_W);
-      const y = clamp(d.origin.y + (e.clientY - d.startY) * scale, 0, VIEW_H - NODE_H);
+      const r = MAX_R;
+      const x = clamp(d.origin.x + (e.clientX - d.startX) * scale, r, VIEW_W - r);
+      const y = clamp(d.origin.y + (e.clientY - d.startY) * scale, r, VIEW_H - r - 24);
       setPositions((prev) => ({ ...prev, [d.id]: { x, y } }));
     },
     [unitsPerPixel]
@@ -167,27 +178,34 @@ function GraphPreview({ animated, interactive }: { animated: boolean; interactiv
       className="w-full h-full"
       preserveAspectRatio="xMidYMid meet"
     >
-      {/* Edges first so node rectangles paint over their endpoints — that is what
-          lets a node drift or be dragged without a line appearing to detach. */}
+      {/* Edges first so the circles paint over their endpoints — that's what lets
+          a node drift or be dragged without a line appearing to detach. */}
       <g>
         {EDGES.map((e, i) => {
           const a = positions[e.from];
           const b = positions[e.to];
           if (!a || !b) return null;
+          const touches = active ? active.has(e.from) && active.has(e.to) : false;
+          const dim = active ? !touches : false;
           return (
-            <path
+            <line
               key={`${e.from}-${e.to}`}
-              d={edgePath(a, b)}
-              fill="none"
-              stroke={e.semantic ? EDGE_SEMANTIC : EDGE_CITATION}
-              strokeWidth={1.5}
+              x1={a.x}
+              y1={a.y}
+              x2={b.x}
+              y2={b.y}
+              stroke={touches ? '#FFFFFF' : e.semantic ? EDGE_SEMANTIC : EDGE_CITATION}
+              strokeWidth={touches ? 2.5 : 1.5}
               strokeDasharray={e.semantic ? '6 3' : undefined}
-              opacity={0.5}
-              className={animated && e.semantic ? 'tm-pulse' : undefined}
+              opacity={dim ? 0.08 : touches ? 1 : 0.5}
+              className={animated && e.semantic && !active ? 'tm-pulse' : undefined}
               style={
-                animated && e.semantic
-                  ? ({ '--tm-dur': `${6 + i}s`, '--tm-delay': `${i * 0.7}s` } as React.CSSProperties)
-                  : undefined
+                {
+                  transition: 'opacity 0.2s, stroke-width 0.2s',
+                  ...(animated && e.semantic && !active
+                    ? { '--tm-dur': `${6 + i}s`, '--tm-delay': `${i * 0.7}s` }
+                    : {}),
+                } as React.CSSProperties
               }
             />
           );
@@ -196,7 +214,10 @@ function GraphPreview({ animated, interactive }: { animated: boolean; interactiv
 
       {NODES.map((n) => {
         const p = positions[n.id] ?? { x: n.x, y: n.y };
-        const drifting = animated && !grabbed.has(n.id);
+        const drifting = animated && !grabbed.has(n.id) && !active;
+        const r = radiusOf(n.citations);
+        const isActive = active ? active.has(n.id) : false;
+        const isFocus = hovered === n.id;
         return (
           <g
             key={n.id}
@@ -213,21 +234,46 @@ function GraphPreview({ animated, interactive }: { animated: boolean; interactiv
                     '--tm-delay': `${n.delay}s`,
                   } as React.CSSProperties)
                 : {}),
-              // Stops touch-drag from scrolling the page instead of moving a node.
+              opacity: active && !isActive ? 0.15 : 1,
+              transition: 'opacity 0.2s',
               ...(interactive ? { touchAction: 'none' as const } : {}),
             }}
             onPointerDown={interactive ? (e) => handlePointerDown(e, n.id) : undefined}
             onPointerMove={interactive ? handlePointerMove : undefined}
             onPointerUp={interactive ? handlePointerUp : undefined}
             onPointerCancel={interactive ? handlePointerUp : undefined}
+            onMouseEnter={() => setHovered(n.id)}
+            onMouseLeave={() => setHovered(null)}
           >
-            <rect x={p.x} y={p.y} width={NODE_W} height={NODE_H} fill="#FFFFFF" stroke="#000000" strokeWidth={2} />
-            <rect x={p.x} y={p.y} width={4} height={NODE_H} fill={n.accent} />
-            <text x={p.x + 14} y={p.y + 27} fill="#000000" fontSize={12} fontWeight={600} fontFamily="var(--font-dm-sans), system-ui, sans-serif">
-              {n.title}
+            <circle
+              cx={p.x}
+              cy={p.y}
+              r={r}
+              fill={n.accent}
+              stroke={isFocus ? '#FFFFFF' : 'rgba(255,255,255,0.55)'}
+              strokeWidth={isFocus ? 3 : 2}
+              style={{ transition: 'stroke-width 0.15s' }}
+            />
+            <text
+              x={p.x}
+              y={p.y + r + 16}
+              textAnchor="middle"
+              fill="#FFFFFF"
+              fontSize={12}
+              fontWeight={600}
+              fontFamily="var(--font-dm-sans), system-ui, sans-serif"
+            >
+              {n.title.length > 26 ? `${n.title.slice(0, 25)}…` : n.title}
             </text>
-            <text x={p.x + 14} y={p.y + 48} fill="#666666" fontSize={10} fontFamily="var(--font-dm-sans), system-ui, sans-serif">
-              {n.meta}
+            <text
+              x={p.x}
+              y={p.y + r + 30}
+              textAnchor="middle"
+              fill="rgba(255,255,255,0.45)"
+              fontSize={10}
+              fontFamily="var(--font-dm-sans), system-ui, sans-serif"
+            >
+              {n.year} · {shortCount(n.citations)} cit.
             </text>
           </g>
         );
@@ -315,7 +361,7 @@ function DefencePreview() {
 export type PreviewKind = 'graph' | 'outline' | 'gaps' | 'defence';
 
 const LABELS: Record<PreviewKind, string> = {
-  graph: 'Preview of the ThesisMaps knowledge graph: saved papers connected by citation and semantic-similarity links',
+  graph: 'Preview of the ThesisMaps knowledge graph: papers as circles sized by citation count, connected by citation and semantic-similarity links',
   outline: 'Preview of the outline builder: thesis chapters with assigned paper counts and coverage scores',
   gaps: 'Preview of gap detection: topic clusters ranked by how under-researched they are',
   defence: 'Preview of defence readiness: anticipated counter-arguments and critiques',
@@ -339,7 +385,7 @@ export function ProductPreview({
   return (
     <PreviewFrame
       label={LABELS[kind]}
-      hint={isGraph && interactive ? 'Drag the papers' : undefined}
+      hint={isGraph ? (interactive ? 'Drag · hover to isolate' : 'Hover to isolate') : undefined}
     >
       {kind === 'outline' ? (
         <OutlinePreview />

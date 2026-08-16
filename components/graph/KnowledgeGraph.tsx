@@ -10,33 +10,25 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { X, ExternalLink, Sparkles } from 'lucide-react';
 import { apiClient } from '@/lib/apiClient';
 import { PaperNode, type PaperNodeData } from './PaperNode';
-import { edgeTypes } from './EdgeTypes';
+import { edgeTypes, type GraphEdgeData } from './EdgeTypes';
 import { GraphControls } from './GraphControls';
 import { nodeColor } from './nodeColor';
+import { radiusMap } from './nodeSize';
+import { useForceLayout } from './useForceLayout';
 import { Badge } from '@/components/ui/Badge';
-import type { GraphData, HeatmapMode, GraphNode } from '@/types/graph';
+import type { GraphData, HeatmapMode, GraphNode, NodeSizeMode, GraphViewMode } from '@/types/graph';
 import type { Paper } from '@/types/paper';
 
 const nodeTypes = { paper: PaperNode };
-
-function buildNodes(graphNodes: GraphNode[], heatmapMode: HeatmapMode, maxCitations: number): Node<PaperNodeData>[] {
-  return graphNodes.map((gn, i) => ({
-    id: gn.id,
-    type: 'paper',
-    data: { ...gn, heatmapMode, maxCitations },
-    position: { x: (i % 4) * 240 - 360, y: Math.floor(i / 4) * 130 - 200 },
-  }));
-}
-
-function buildEdges(graphEdges: GraphData['edges']): Edge[] {
-  return graphEdges.map((e) => ({ id: e.id, source: e.source, target: e.target, type: e.type }));
-}
 
 const EDGE_COLORS: Record<string, string> = {
   citation: '#64748B',
   semantic_similarity: '#0066FF',
   co_author: '#94A3B8',
 };
+
+/** Below this many nodes, every label stays on; above it, only the larger ones. */
+const LABEL_ALL_BELOW = 14;
 
 type SimilarPaper = { id: string; title: string; year: number | null; similarity: number };
 
@@ -50,18 +42,99 @@ type KnowledgeGraphProps = {
   projectId?: string;
 };
 
-export function KnowledgeGraph({ data, showMinimap, heatmapMode, onToggleMinimap, onHeatmapChange, projectId }: KnowledgeGraphProps) {
+export function KnowledgeGraph({
+  data,
+  showMinimap,
+  heatmapMode,
+  onToggleMinimap,
+  onHeatmapChange,
+  projectId,
+}: KnowledgeGraphProps) {
+  const [sizeMode, setSizeMode] = useState<NodeSizeMode>('citations');
+  const [viewMode, setViewMode] = useState<GraphViewMode>('cluster');
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedPaper, setSelectedPaper] = useState<Paper | null>(null);
+
   const maxCitations = useMemo(
     () => data.nodes.reduce((m, n) => Math.max(m, n.paper.citationCount || 0), 0),
     [data.nodes]
   );
 
-  const [nodes, setNodes, onNodesChange] = useNodesState<PaperNodeData>(buildNodes(data.nodes, heatmapMode, maxCitations));
-  const [edges, setEdges, onEdgesChange] = useEdgesState(buildEdges(data.edges));
-  const [selectedPaper, setSelectedPaper] = useState<Paper | null>(null);
+  const yearRange = useMemo(() => {
+    const years = data.nodes.map((n) => n.paper.year).filter((y) => y > 0);
+    return years.length
+      ? { min: Math.min(...years), max: Math.max(...years) }
+      : { min: 1990, max: new Date().getFullYear() };
+  }, [data.nodes]);
+
+  // Radii drive both the visual encoding and the simulation's collision/charge.
+  const radii = useMemo(() => radiusMap(data, sizeMode), [data, sizeMode]);
+
+  const { positions, pin, release } = useForceLayout(data, radii, viewMode);
+
+  /** The selection plus its direct neighbours — everything else gets dimmed. */
+  const neighbours = useMemo(() => {
+    if (!selectedId) return null;
+    const set = new Set<string>([selectedId]);
+    for (const e of data.edges) {
+      if (e.source === selectedId) set.add(e.target);
+      if (e.target === selectedId) set.add(e.source);
+    }
+    return set;
+  }, [selectedId, data.edges]);
+
+  const [nodes, setNodes, onNodesChange] = useNodesState<PaperNodeData>([]);
+  const [edges, setEdges, onEdgesChange] = useEdgesState<GraphEdgeData>([]);
+
+  // Rebuild whenever the simulation moves nodes or the encoding changes.
+  useEffect(() => {
+    const labelEverything = data.nodes.length <= LABEL_ALL_BELOW;
+    const next: Node<PaperNodeData>[] = data.nodes.map((gn) => {
+      const radius = radii.get(gn.id) ?? 20;
+      return {
+        id: gn.id,
+        type: 'paper',
+        position: positions.get(gn.id) ?? { x: 0, y: 0 },
+        data: {
+          ...gn,
+          heatmapMode,
+          maxCitations,
+          yearRange,
+          radius,
+          dimmed: neighbours ? !neighbours.has(gn.id) : false,
+          highlighted: neighbours ? neighbours.has(gn.id) : false,
+          showLabel: labelEverything || radius > 24,
+        },
+      };
+    });
+    setNodes(next);
+  }, [positions, data.nodes, radii, heatmapMode, maxCitations, yearRange, neighbours, setNodes]);
+
+  useEffect(() => {
+    const next: Edge<GraphEdgeData>[] = data.edges.map((e) => {
+      const touchesSelection = selectedId ? e.source === selectedId || e.target === selectedId : false;
+      return {
+        id: e.id,
+        source: e.source,
+        target: e.target,
+        type: e.type,
+        data: { dimmed: selectedId ? !touchesSelection : false, highlighted: touchesSelection },
+      };
+    });
+    setEdges(next);
+  }, [data.edges, selectedId, setEdges]);
+
   const { zoomIn, zoomOut, fitView } = useReactFlow();
 
-  // "Find similar papers" — embedding-backed nearest neighbours.
+  // Refit once the layout settles — `fitView` as a prop only runs at init, when
+  // every node is still sitting on its seed ring.
+  useEffect(() => {
+    if (positions.size === 0) return;
+    const t = setTimeout(() => void fitView({ padding: 0.2, duration: 400 }), 900);
+    return () => clearTimeout(t);
+  }, [viewMode, sizeMode, data.nodes.length, positions.size, fitView]);
+
+  // --- "Find similar papers" ---
   const [similar, setSimilar] = useState<SimilarPaper[] | null>(null);
   const [similarLoading, setSimilarLoading] = useState(false);
   const [similarNote, setSimilarNote] = useState<string | null>(null);
@@ -89,60 +162,53 @@ export function KnowledgeGraph({ data, showMinimap, heatmapMode, onToggleMinimap
     }
   }, [selectedPaper, projectId, similarLoading]);
 
-  // Rebuild fully when the underlying graph data changes.
-  useEffect(() => {
-    setNodes(buildNodes(data.nodes, heatmapMode, maxCitations));
-    setEdges(buildEdges(data.edges));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [data]);
-
-  // Recolour in place (preserving dragged positions) when the heatmap changes.
-  useEffect(() => {
-    setNodes((prev) => prev.map((n) => ({ ...n, data: { ...n.data, heatmapMode, maxCitations } })));
-  }, [heatmapMode, maxCitations, setNodes]);
-
   const onNodeClick: NodeMouseHandler = useCallback((_, node) => {
-    setSelectedPaper((node.data as GraphNode).paper);
-    // Reset per-paper similarity state when switching nodes.
+    const gn = node.data as GraphNode;
+    setSelectedId(gn.id);
+    setSelectedPaper(gn.paper);
     setSimilar(null);
     setSimilarNote(null);
   }, []);
 
+  const clearSelection = useCallback(() => {
+    setSelectedId(null);
+    setSelectedPaper(null);
+  }, []);
+
+  // Dragging pins the node in the simulation so it stays put, then releases it
+  // so the rest of the layout can relax around the new arrangement.
+  const onNodeDrag = useCallback<NodeMouseHandler>((_, node) => pin(node.id, node.position.x, node.position.y), [pin]);
+  const onNodeDragStop = useCallback<NodeMouseHandler>((_, node) => release(node.id), [release]);
+
   const handleExport = useCallback(() => {
     if (nodes.length === 0) return;
-    const W = 180;
-    const H = 70;
-    const pad = 60;
-    const xs = nodes.map((n) => n.position.x);
-    const ys = nodes.map((n) => n.position.y);
-    const minX = Math.min(...xs);
-    const minY = Math.min(...ys);
-    const width = Math.max(...xs) - minX + W + pad * 2;
-    const height = Math.max(...ys) - minY + H + pad * 2;
-    const pos = new Map(nodes.map((n) => [n.id, n.position]));
+    const pad = 90;
+    const pts = nodes.map((n) => ({ x: n.position.x, y: n.position.y, r: n.data.radius }));
+    const minX = Math.min(...pts.map((p) => p.x - p.r));
+    const minY = Math.min(...pts.map((p) => p.y - p.r));
+    const width = Math.max(...pts.map((p) => p.x + p.r)) - minX + pad * 2;
+    const height = Math.max(...pts.map((p) => p.y + p.r)) - minY + pad * 2;
+    const pos = new Map(nodes.map((n) => [n.id, { x: n.position.x - minX + pad, y: n.position.y - minY + pad }]));
 
     const edgeSvg = edges
       .map((e) => {
         const s = pos.get(e.source);
         const t = pos.get(e.target);
         if (!s || !t) return '';
-        const x1 = s.x - minX + pad + W;
-        const y1 = s.y - minY + pad + H / 2;
-        const x2 = t.x - minX + pad;
-        const y2 = t.y - minY + pad + H / 2;
-        const color = EDGE_COLORS[e.type ?? 'citation'] ?? '#CBD5E1';
+        const color = EDGE_COLORS[e.type ?? 'citation'] ?? '#64748B';
         const dash = e.type === 'semantic_similarity' ? '6 3' : e.type === 'co_author' ? '2 2' : 'none';
-        return `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${color}" stroke-width="1.5" stroke-dasharray="${dash}" opacity="0.5"/>`;
+        return `<line x1="${s.x}" y1="${s.y}" x2="${t.x}" y2="${t.y}" stroke="${color}" stroke-width="1.5" stroke-dasharray="${dash}" opacity="0.4"/>`;
       })
       .join('');
 
     const nodeSvg = nodes
       .map((n) => {
-        const x = n.position.x - minX + pad;
-        const y = n.position.y - minY + pad;
-        const color = nodeColor(n.data, heatmapMode, maxCitations);
-        const title = (n.data.paper.title || '').slice(0, 40).replace(/[<&>]/g, '');
-        return `<g><rect x="${x}" y="${y}" width="${W}" height="${H}" fill="#FFFFFF" stroke="#000000" stroke-width="2"/><rect x="${x}" y="${y}" width="4" height="${H}" fill="${color}"/><text x="${x + 12}" y="${y + 26}" fill="#000000" font-family="sans-serif" font-size="11">${title}</text><text x="${x + 12}" y="${y + 46}" fill="#666666" font-family="sans-serif" font-size="10">${n.data.paper.year || ''} · ${n.data.paper.citationCount} cit.</text></g>`;
+        const p = pos.get(n.id);
+        if (!p) return '';
+        const fill = nodeColor(n.data, heatmapMode, maxCitations, yearRange);
+        const title = (n.data.paper.title || '').slice(0, 34).replace(/[<&>]/g, '');
+        const r = n.data.radius;
+        return `<g><circle cx="${p.x}" cy="${p.y}" r="${r}" fill="${fill}" stroke="#000000" stroke-width="2"/><text x="${p.x}" y="${p.y + r + 14}" text-anchor="middle" fill="#000000" font-family="sans-serif" font-size="10">${title}</text><text x="${p.x}" y="${p.y + r + 26}" text-anchor="middle" fill="#666666" font-family="sans-serif" font-size="9">${n.data.paper.year || ''} - ${n.data.paper.citationCount} cit.</text></g>`;
       })
       .join('');
 
@@ -154,7 +220,7 @@ export function KnowledgeGraph({ data, showMinimap, heatmapMode, onToggleMinimap
     a.download = 'thesismaps-graph.svg';
     a.click();
     URL.revokeObjectURL(url);
-  }, [nodes, edges, heatmapMode, maxCitations]);
+  }, [nodes, edges, heatmapMode, maxCitations, yearRange]);
 
   return (
     <div className="relative w-full h-full bg-graph-bg">
@@ -164,9 +230,14 @@ export function KnowledgeGraph({ data, showMinimap, heatmapMode, onToggleMinimap
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onNodeClick={onNodeClick}
-        onPaneClick={() => setSelectedPaper(null)}
+        onNodeDrag={onNodeDrag}
+        onNodeDragStop={onNodeDragStop}
+        onPaneClick={clearSelection}
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
+        // Position refers to the node's centre, which is what the force
+        // simulation produces and what makes centre-to-centre edges line up.
+        nodeOrigin={[0.5, 0.5]}
         fitView
         minZoom={0.1}
         maxZoom={3}
@@ -177,7 +248,9 @@ export function KnowledgeGraph({ data, showMinimap, heatmapMode, onToggleMinimap
           <MiniMap
             style={{ background: '#FFFFFF', border: '2px solid #000000' }}
             maskColor="rgba(0,0,0,0.1)"
-            nodeColor={(n) => nodeColor((n.data as PaperNodeData) ?? ({} as PaperNodeData), heatmapMode, maxCitations)}
+            nodeColor={(n) =>
+              nodeColor((n.data as PaperNodeData) ?? ({} as PaperNodeData), heatmapMode, maxCitations, yearRange)
+            }
           />
         ) : null}
       </ReactFlow>
@@ -185,29 +258,33 @@ export function KnowledgeGraph({ data, showMinimap, heatmapMode, onToggleMinimap
       <GraphControls
         onZoomIn={() => void zoomIn()}
         onZoomOut={() => void zoomOut()}
-        onFitView={() => void fitView()}
+        onFitView={() => void fitView({ padding: 0.2 })}
         showMinimap={showMinimap}
         onToggleMinimap={onToggleMinimap}
         heatmapMode={heatmapMode}
         onHeatmapChange={onHeatmapChange}
+        sizeMode={sizeMode}
+        onSizeModeChange={setSizeMode}
+        viewMode={viewMode}
+        onViewModeChange={setViewMode}
         onExport={handleExport}
       />
 
-      {/* Legend */}
-      <div className="absolute bottom-4 left-4 z-10 bg-white border-2 border-black p-3 hidden sm:block">
+      {/* Legend — reflects what size and colour currently encode. */}
+      <div className="absolute bottom-4 left-4 z-10 bg-white border-2 border-black p-3 hidden sm:block max-w-[210px]">
         <p className="text-[9px] font-sans font-black uppercase tracking-[0.2em] text-black mb-2">Legend</p>
-        <ul className="space-y-1">
-          {[
-            { c: '#0066FF', l: 'Seed / Recent' },
-            { c: '#000000', l: 'Influential' },
-            { c: '#94A3B8', l: 'Cited' },
-          ].map((item) => (
-            <li key={item.l} className="flex items-center gap-2">
-              <span className="w-3 h-3 border border-black" style={{ backgroundColor: item.c }} />
-              <span className="text-[10px] font-sans font-bold uppercase tracking-wider text-black">{item.l}</span>
-            </li>
-          ))}
-        </ul>
+        <div className="flex items-end gap-1.5 mb-2">
+          <span className="rounded-full border-2 border-black bg-accent" style={{ width: 10, height: 10 }} />
+          <span className="rounded-full border-2 border-black bg-accent" style={{ width: 16, height: 16 }} />
+          <span className="rounded-full border-2 border-black bg-accent" style={{ width: 24, height: 24 }} />
+          <span className="text-[9px] font-sans font-bold uppercase tracking-wider text-black/60 ml-1">
+            {sizeMode === 'connections' ? 'Connections' : sizeMode === 'uniform' ? 'Uniform' : 'Citations'}
+          </span>
+        </div>
+        <p className="text-[9px] font-sans font-bold uppercase tracking-wider text-black/50 leading-snug">
+          {viewMode === 'timeline' ? 'Left to right = older to newer' : 'Closer together = more related'}
+        </p>
+        <p className="text-[9px] font-sans text-black/40 mt-1 leading-snug">Click a paper to isolate its links.</p>
       </div>
 
       {/* Node detail panel */}
@@ -228,7 +305,7 @@ export function KnowledgeGraph({ data, showMinimap, heatmapMode, onToggleMinimap
                   {selectedPaper.title}
                 </h2>
                 <button
-                  onClick={() => setSelectedPaper(null)}
+                  onClick={clearSelection}
                   aria-label="Close panel"
                   className="p-1 border-2 border-black hover:bg-black hover:text-white text-black transition-colors flex-shrink-0"
                 >
