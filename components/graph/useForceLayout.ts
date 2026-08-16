@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useMemo } from 'react';
 import {
   forceCenter,
   forceCollide,
@@ -9,7 +9,6 @@ import {
   forceSimulation,
   forceX,
   forceY,
-  type Simulation,
   type SimulationNodeDatum,
 } from 'd3-force';
 import type { GraphData, GraphViewMode } from '@/types/graph';
@@ -17,15 +16,19 @@ import type { GraphData, GraphViewMode } from '@/types/graph';
 /**
  * d3-force layout for the knowledge graph.
  *
- * Replaces the previous `(i % 4) * 240` grid, which imposed a structure on the
- * data instead of letting one emerge from it — connected papers sat far apart,
- * unrelated ones sat adjacent, and the arrangement said nothing true.
+ * Replaces the old `(i % 4) * 240` grid, which imposed a structure on the data
+ * instead of letting one emerge from it — connected papers could sit far apart
+ * and unrelated ones adjacent, so position said nothing true.
  *
- * The simulation only computes coordinates; ReactFlow still renders, so zoom,
- * pan, the minimap, SVG export and the detail panel all keep working.
+ * The simulation is run to completion **synchronously** and the final positions
+ * handed to ReactFlow once. An earlier version ticked inside requestAnimationFrame
+ * for an animated settle, but that meant the simulation and ReactFlow's drag
+ * handling were both writing node positions every frame: dragging a node made it
+ * jump or disappear as the two fought. Settling up front costs a few ms for a
+ * library of this size and makes dragging behave exactly as you'd expect.
  */
 
-export type SimNode = SimulationNodeDatum & { id: string; radius: number };
+type SimNode = SimulationNodeDatum & { id: string; radius: number };
 type SimLink = { source: string | SimNode; target: string | SimNode; weight: number; type: string };
 
 export type Positions = Map<string, { x: number; y: number }>;
@@ -36,56 +39,59 @@ export type Positions = Map<string, { x: number; y: number }>;
  * claim and are allowed to sit loose.
  */
 function linkDistance(type: string, weight: number): number {
-  if (type === 'citation') return 110;
+  if (type === 'citation') return 150;
   if (type === 'semantic_similarity') {
     // weight is cosine similarity 0..1 — closer meaning, shorter link.
-    return 220 - Math.min(1, Math.max(0, weight)) * 110;
+    return 300 - Math.min(1, Math.max(0, weight)) * 130;
   }
-  return 200;
+  return 260;
 }
 
 function linkStrength(type: string, weight: number): number {
-  if (type === 'citation') return 0.9;
-  if (type === 'semantic_similarity') return 0.25 + Math.min(1, Math.max(0, weight)) * 0.5;
-  return 0.2;
+  if (type === 'citation') return 0.8;
+  if (type === 'semantic_similarity') return 0.2 + Math.min(1, Math.max(0, weight)) * 0.4;
+  return 0.12;
 }
 
 export function useForceLayout(
   data: GraphData,
   radii: Map<string, number>,
-  viewMode: GraphViewMode,
-  width = 1200,
-  height = 700
-): { positions: Positions; settled: boolean; pin: (id: string, x: number, y: number) => void; release: (id: string) => void } {
-  const [positions, setPositions] = useState<Positions>(new Map());
-  const [settled, setSettled] = useState(false);
-  const simRef = useRef<Simulation<SimNode, undefined> | null>(null);
-  const nodesRef = useRef<SimNode[]>([]);
-  const frameRef = useRef<number | null>(null);
+  viewMode: GraphViewMode
+): Positions {
+  // Recompute only when the graph, the sizing or the view mode actually change —
+  // not on every refetch that returns an identical graph with a new identity.
+  const signature = useMemo(
+    () =>
+      data.nodes.map((n) => `${n.id}:${Math.round(radii.get(n.id) ?? 0)}`).join(',') +
+      '|' +
+      data.edges.map((e) => `${e.source}>${e.target}:${e.type}`).join(',') +
+      '|' +
+      viewMode,
+    [data, radii, viewMode]
+  );
 
-  // Re-run whenever the graph, the sizing, or the view mode changes.
-  // `data.nodes.length` + the id list keep this from re-firing on every fetch
-  // that returns an identical graph with a fresh object identity.
-  const signature = data.nodes.map((n) => n.id).join(',') + '|' + data.edges.length + '|' + viewMode;
-
-  useEffect(() => {
-    if (data.nodes.length === 0) return;
+  return useMemo(() => {
+    const positions: Positions = new Map();
+    if (data.nodes.length === 0) return positions;
 
     const years = data.nodes.map((n) => n.paper.year).filter((y) => y > 0);
     const minYear = years.length ? Math.min(...years) : 0;
     const maxYear = years.length ? Math.max(...years) : 0;
     const yearSpan = Math.max(1, maxYear - minYear);
 
-    // Seed on a circle rather than at the origin: identical start positions make
-    // the first ticks explode unpredictably.
+    // Width scales with node count so a big library doesn't end up cramped.
+    const width = Math.max(900, data.nodes.length * 90);
+    const height = Math.max(600, data.nodes.length * 45);
+
+    // Seed on a circle: identical starting points make the first ticks explode.
     const simNodes: SimNode[] = data.nodes.map((n, i) => {
       const angle = (i / data.nodes.length) * Math.PI * 2;
-      const seedRadius = Math.min(width, height) / 3;
+      const seed = Math.min(width, height) / 3;
       return {
         id: n.id,
         radius: radii.get(n.id) ?? 20,
-        x: Math.cos(angle) * seedRadius,
-        y: Math.sin(angle) * seedRadius,
+        x: Math.cos(angle) * seed,
+        y: Math.sin(angle) * seed,
       };
     });
 
@@ -102,16 +108,17 @@ export function useForceLayout(
           .distance((l) => linkDistance(l.type, l.weight))
           .strength((l) => linkStrength(l.type, l.weight))
       )
-      // Charge scales with radius so big nodes claim proportionate space rather
-      // than swallowing their neighbours.
-      .force('charge', forceManyBody<SimNode>().strength((d) => -220 - d.radius * 12))
-      // Hard separation: circles must never overlap, whatever the forces want.
-      .force('collide', forceCollide<SimNode>().radius((d) => d.radius + 26).strength(0.9))
-      .alphaDecay(0.025);
+      // Charge scales with radius so large nodes claim proportionate space
+      // instead of swallowing their neighbours.
+      .force('charge', forceManyBody<SimNode>().strength((d) => -400 - d.radius * 20))
+      // Hard separation: circles and their labels must never overlap, whatever
+      // the other forces want. The +54 leaves room for the two label lines.
+      .force('collide', forceCollide<SimNode>().radius((d) => d.radius + 54).strength(1))
+      .stop();
 
     if (viewMode === 'timeline') {
-      // X is publication year — position becomes literally meaningful. Strong X,
-      // weak Y so the simulation only relaxes vertical stacking within a year.
+      // X becomes publication year, so horizontal position is literally
+      // meaningful. Strong on X, weak on Y so the sim only relaxes stacking.
       sim
         .force(
           'x',
@@ -122,72 +129,18 @@ export function useForceLayout(
             return ((year - minYear) / yearSpan) * width - width / 2;
           }).strength(1)
         )
-        .force('y', forceY<SimNode>(0).strength(0.06))
-        .force('center', null);
+        .force('y', forceY<SimNode>(0).strength(0.05));
     } else {
-      sim.force('center', forceCenter(0, 0)).force('x', null).force('y', null);
+      sim.force('center', forceCenter(0, 0));
     }
 
-    simRef.current = sim;
-    nodesRef.current = simNodes;
-    setSettled(false);
-
-    // Drive ticks ourselves so React state updates once per frame instead of
-    // once per tick — d3's own timer would outpace rendering.
+    // Run to a settled state up front. 400 ticks is comfortably past convergence
+    // for libraries of this size and takes only a few milliseconds.
+    sim.tick(400);
     sim.stop();
-    const step = () => {
-      sim.tick();
-      const next: Positions = new Map();
-      for (const n of nodesRef.current) next.set(n.id, { x: n.x ?? 0, y: n.y ?? 0 });
-      setPositions(next);
 
-      if (sim.alpha() > 0.02) {
-        frameRef.current = requestAnimationFrame(step);
-      } else {
-        frameRef.current = null;
-        setSettled(true);
-      }
-    };
-    frameRef.current = requestAnimationFrame(step);
-
-    return () => {
-      if (frameRef.current !== null) cancelAnimationFrame(frameRef.current);
-      sim.stop();
-      simRef.current = null;
-    };
+    for (const n of simNodes) positions.set(n.id, { x: n.x ?? 0, y: n.y ?? 0 });
+    return positions;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [signature, radii, width, height]);
-
-  /** Pins a node under the cursor while it's being dragged. */
-  const pin = (id: string, x: number, y: number) => {
-    const node = nodesRef.current.find((n) => n.id === id);
-    if (!node) return;
-    node.fx = x;
-    node.fy = y;
-    const sim = simRef.current;
-    if (sim && sim.alpha() < 0.1) {
-      sim.alpha(0.3);
-      if (frameRef.current === null) {
-        const step = () => {
-          sim.tick();
-          const next: Positions = new Map();
-          for (const n of nodesRef.current) next.set(n.id, { x: n.x ?? 0, y: n.y ?? 0 });
-          setPositions(next);
-          if (sim.alpha() > 0.02) frameRef.current = requestAnimationFrame(step);
-          else frameRef.current = null;
-        };
-        frameRef.current = requestAnimationFrame(step);
-      }
-    }
-  };
-
-  /** Lets a dragged node rejoin the simulation. */
-  const release = (id: string) => {
-    const node = nodesRef.current.find((n) => n.id === id);
-    if (!node) return;
-    node.fx = null;
-    node.fy = null;
-  };
-
-  return { positions, settled, pin, release };
+  }, [signature]);
 }

@@ -10,7 +10,7 @@ import { ProductPreview } from '@/components/marketing/ProductPreview';
 import { MarketingFooter } from '@/components/layout/MarketingFooter';
 
 export const metadata: Metadata = {
-  title: 'ThesisMaps — Visual Research Intelligence for Graduate Researchers',
+  title: 'ThesisMaps: Visual Research Intelligence for Graduate Researchers',
   description:
     'Map your literature, discover research gaps, and build your thesis with confidence. The visual research platform built for PhD and masters students.',
   alternates: { canonical: 'https://www.thesismaps.com' },
@@ -38,7 +38,7 @@ const FEATURES = [
     label: 'Knowledge Graph',
     preview: 'graph' as const,
     heading: 'See how your literature connects',
-    body: 'Visualise citation networks, semantic similarity, and co-authorship links across hundreds of papers — all on a single interactive canvas.',
+    body: 'Visualise citation networks, semantic similarity, and co-authorship links across hundreds of papers, all on a single interactive canvas.',
     icon: GitFork,
   },
   {
@@ -59,13 +59,13 @@ const FEATURES = [
     label: 'Defence Readiness',
     preview: 'defence' as const,
     heading: 'Prepare for the toughest questions',
-    body: 'ThesisMaps surfaces counter-arguments, contradicting findings, and methodological critiques — then generates a defence checklist tailored to your thesis.',
+    body: 'ThesisMaps surfaces counter-arguments, contradicting findings, and methodological critiques, then generates a defence checklist tailored to your thesis.',
     icon: Shield,
   },
 ];
 
 const DIFFERENTIATORS = [
-  { icon: Search, title: 'Multi-Source Search', description: 'Semantic Scholar, OpenAlex, arXiv, CrossRef, PubMed and more — unified in one search.' },
+  { icon: Search, title: 'Multi-Source Search', description: 'Semantic Scholar, OpenAlex, arXiv, CrossRef, PubMed and more, unified in one search.' },
   { icon: GitFork, title: 'Research Debt Tracker', description: 'Never lose track of papers you saved but haven\'t read. Clear your backlog before writing.' },
   { icon: Clock, title: 'Literature Timeline', description: 'Visualise how your field evolved year by year to frame your contribution in historical context.' },
   { icon: Shield, title: 'Defence Readiness Mode', description: 'Turn threats into prepared answers before you walk into the viva room.' },

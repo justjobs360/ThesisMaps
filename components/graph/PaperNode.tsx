@@ -44,17 +44,17 @@ function PaperNodeImpl({ data, selected }: NodeProps<PaperNodeData>) {
         style={{ left: '50%', top: '50%', transform: 'translate(-50%, -50%)' }}
       />
 
+      {/* Brutalist: solid black border at full weight, no soft shadow or glow.
+          Selection reads as a heavier ring, not a blur. */}
       <div
-        className="rounded-full border-2 cursor-pointer transition-all duration-150"
+        className="rounded-full cursor-pointer transition-all duration-150"
         style={{
           width: size,
           height: size,
           backgroundColor: fill,
-          borderColor: isFocus ? '#000000' : 'rgba(0,0,0,0.35)',
-          borderWidth: isFocus ? 3 : 2,
-          boxShadow: isFocus ? '0 0 0 4px rgba(0,102,255,0.25)' : undefined,
+          border: `${isFocus ? 4 : 2}px solid #000000`,
         }}
-        title={`${data.paper.title} — ${data.paper.year || 'n.d.'}, ${data.paper.citationCount.toLocaleString()} citations`}
+        title={`${data.paper.title} (${data.paper.year || 'n.d.'}) — ${data.paper.citationCount.toLocaleString()} citations`}
       />
 
       {data.isBookmarked ? (

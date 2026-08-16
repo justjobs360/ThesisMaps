@@ -3,7 +3,7 @@ import { ImageResponse } from 'next/og';
 // Generated at build time instead of committing a binary — public/ was empty, so
 // the previously referenced /og-image.png 404'd on every social preview.
 export const runtime = 'edge';
-export const alt = 'ThesisMaps — Visual Research Intelligence for Graduate Researchers';
+export const alt = 'ThesisMaps: Visual Research Intelligence for Graduate Researchers';
 export const size = { width: 1200, height: 630 };
 export const contentType = 'image/png';
 

@@ -89,28 +89,39 @@ function neighboursOf(id: string): Set<string> {
 }
 
 /**
- * Dark frame shared by every preview, so the content inside reads as product UI
- * sitting on a canvas.
+ * Frame around a preview.
+ *
+ * `dark` only for the graph, where a dark canvas is what makes the coloured
+ * circles and their links read. The panel previews are white cards that already
+ * carry their own black borders, so a dark box around them just adds a heavy
+ * container without conveying anything.
  */
 function PreviewFrame({
   children,
   label,
   hint,
+  dark = false,
 }: {
   children: React.ReactNode;
   label: string;
   hint?: string;
+  dark?: boolean;
 }) {
   return (
     <div
-      className="relative w-full h-full overflow-hidden bg-black border-2 border-black shadow-impact"
+      className={[
+        'relative w-full h-full overflow-hidden',
+        dark ? 'bg-black border-2 border-black shadow-impact' : '',
+      ].join(' ').trim()}
       role="img"
       aria-label={label}
     >
-      <div
-        className="absolute inset-0 opacity-20 bg-[radial-gradient(#ffffff_1px,transparent_1px)] [background-size:20px_20px]"
-        aria-hidden
-      />
+      {dark ? (
+        <div
+          className="absolute inset-0 opacity-20 bg-[radial-gradient(#ffffff_1px,transparent_1px)] [background-size:20px_20px]"
+          aria-hidden
+        />
+      ) : null}
       <div className="relative w-full h-full">{children}</div>
       {hint ? (
         <span className="absolute bottom-2 right-3 text-[9px] font-sans font-black uppercase tracking-widest text-white/40 pointer-events-none select-none">
@@ -385,6 +396,7 @@ export function ProductPreview({
   return (
     <PreviewFrame
       label={LABELS[kind]}
+      dark={isGraph}
       hint={isGraph ? (interactive ? 'Drag · hover to isolate' : 'Hover to isolate') : undefined}
     >
       {kind === 'outline' ? (

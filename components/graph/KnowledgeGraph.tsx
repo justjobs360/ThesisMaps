@@ -70,7 +70,7 @@ export function KnowledgeGraph({
   // Radii drive both the visual encoding and the simulation's collision/charge.
   const radii = useMemo(() => radiusMap(data, sizeMode), [data, sizeMode]);
 
-  const { positions, pin, release } = useForceLayout(data, radii, viewMode);
+  const positions = useForceLayout(data, radii, viewMode);
 
   /** The selection plus its direct neighbours — everything else gets dimmed. */
   const neighbours = useMemo(() => {
@@ -86,29 +86,56 @@ export function KnowledgeGraph({
   const [nodes, setNodes, onNodesChange] = useNodesState<PaperNodeData>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<GraphEdgeData>([]);
 
-  // Rebuild whenever the simulation moves nodes or the encoding changes.
+  const labelEverything = data.nodes.length <= LABEL_ALL_BELOW;
+
+  // LAYOUT — runs only when the simulation produces new coordinates (new data,
+  // different sizing, or a view-mode switch). Kept separate from the appearance
+  // effect below so that selecting or recolouring a node never resets a position
+  // the user has dragged.
   useEffect(() => {
-    const labelEverything = data.nodes.length <= LABEL_ALL_BELOW;
-    const next: Node<PaperNodeData>[] = data.nodes.map((gn) => {
-      const radius = radii.get(gn.id) ?? 20;
-      return {
-        id: gn.id,
-        type: 'paper',
-        position: positions.get(gn.id) ?? { x: 0, y: 0 },
+    setNodes(
+      data.nodes.map((gn) => {
+        const radius = radii.get(gn.id) ?? 20;
+        return {
+          id: gn.id,
+          type: 'paper',
+          position: positions.get(gn.id) ?? { x: 0, y: 0 },
+          data: {
+            ...gn,
+            heatmapMode,
+            maxCitations,
+            yearRange,
+            radius,
+            dimmed: false,
+            highlighted: false,
+            showLabel: labelEverything || radius > 24,
+          },
+        };
+      })
+    );
+    // Deliberately keyed on layout inputs only.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [positions, setNodes]);
+
+  // APPEARANCE — colour, dim/highlight and labels. Rewrites `data` in place and
+  // leaves `position` untouched, so dragging survives.
+  useEffect(() => {
+    setNodes((prev) =>
+      prev.map((n) => ({
+        ...n,
         data: {
-          ...gn,
+          ...n.data,
           heatmapMode,
           maxCitations,
           yearRange,
-          radius,
-          dimmed: neighbours ? !neighbours.has(gn.id) : false,
-          highlighted: neighbours ? neighbours.has(gn.id) : false,
-          showLabel: labelEverything || radius > 24,
+          radius: radii.get(n.id) ?? n.data.radius,
+          dimmed: neighbours ? !neighbours.has(n.id) : false,
+          highlighted: neighbours ? neighbours.has(n.id) : false,
+          showLabel: labelEverything || (radii.get(n.id) ?? 20) > 24,
         },
-      };
-    });
-    setNodes(next);
-  }, [positions, data.nodes, radii, heatmapMode, maxCitations, yearRange, neighbours, setNodes]);
+      }))
+    );
+  }, [heatmapMode, maxCitations, yearRange, neighbours, radii, labelEverything, setNodes]);
 
   useEffect(() => {
     const next: Edge<GraphEdgeData>[] = data.edges.map((e) => {
@@ -126,13 +153,15 @@ export function KnowledgeGraph({
 
   const { zoomIn, zoomOut, fitView } = useReactFlow();
 
-  // Refit once the layout settles — `fitView` as a prop only runs at init, when
-  // every node is still sitting on its seed ring.
+  // Fit AFTER the nodes have been measured. ReactFlow's `fitView` prop runs at
+  // mount, when nodes are still at their default position and have no measured
+  // size, so it zoomed all the way in to a zero-size bounding box — which is why
+  // the graph opened far too close to show any papers.
   useEffect(() => {
-    if (positions.size === 0) return;
-    const t = setTimeout(() => void fitView({ padding: 0.2, duration: 400 }), 900);
+    if (nodes.length === 0) return;
+    const t = setTimeout(() => void fitView({ padding: 0.25, duration: 300 }), 120);
     return () => clearTimeout(t);
-  }, [viewMode, sizeMode, data.nodes.length, positions.size, fitView]);
+  }, [positions, nodes.length, fitView]);
 
   // --- "Find similar papers" ---
   const [similar, setSimilar] = useState<SimilarPaper[] | null>(null);
@@ -174,11 +203,6 @@ export function KnowledgeGraph({
     setSelectedId(null);
     setSelectedPaper(null);
   }, []);
-
-  // Dragging pins the node in the simulation so it stays put, then releases it
-  // so the rest of the layout can relax around the new arrangement.
-  const onNodeDrag = useCallback<NodeMouseHandler>((_, node) => pin(node.id, node.position.x, node.position.y), [pin]);
-  const onNodeDragStop = useCallback<NodeMouseHandler>((_, node) => release(node.id), [release]);
 
   const handleExport = useCallback(() => {
     if (nodes.length === 0) return;
@@ -230,17 +254,17 @@ export function KnowledgeGraph({
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onNodeClick={onNodeClick}
-        onNodeDrag={onNodeDrag}
-        onNodeDragStop={onNodeDragStop}
         onPaneClick={clearSelection}
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
         // Position refers to the node's centre, which is what the force
         // simulation produces and what makes centre-to-centre edges line up.
         nodeOrigin={[0.5, 0.5]}
-        fitView
-        minZoom={0.1}
-        maxZoom={3}
+        // No `fitView` prop: it fires before nodes are measured. The effect above
+        // fits once they exist. minZoom is generous so a wide timeline layout can
+        // zoom out far enough to be readable.
+        minZoom={0.05}
+        maxZoom={2}
         proOptions={{ hideAttribution: true }}
       >
         <Background color="#D1D5DB" gap={20} size={1} />

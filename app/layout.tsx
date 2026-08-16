@@ -21,10 +21,10 @@ const dmSans = DM_Sans({
 export const metadata: Metadata = {
   title: {
     template: '%s | ThesisMaps',
-    default: 'ThesisMaps — Visual Research Intelligence for Graduate Researchers',
+    default: 'ThesisMaps: Visual Research Intelligence for Graduate Researchers',
   },
   description:
-    'ThesisMaps helps PhD and masters students map their literature, discover research gaps, build structured outlines, and prepare for their thesis defence — all in one visual platform.',
+    'ThesisMaps helps PhD and masters students map their literature, discover research gaps, build structured outlines, and prepare for their thesis defence, all in one visual platform.',
   metadataBase: new URL('https://www.thesismaps.com'),
   alternates: { canonical: 'https://www.thesismaps.com' },
   openGraph: {
@@ -32,7 +32,7 @@ export const metadata: Metadata = {
     locale: 'en_GB',
     url: 'https://www.thesismaps.com',
     siteName: 'ThesisMaps',
-    title: 'ThesisMaps — Visual Research Intelligence',
+    title: 'ThesisMaps: Visual Research Intelligence',
     description: 'Map your literature. Find the gaps. Write with confidence.',
     // Images intentionally omitted: app/opengraph-image.tsx generates them and
     // Next injects the tags automatically. Hardcoding /og-image.png here pointed
@@ -40,7 +40,7 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'ThesisMaps — Visual Research Intelligence',
+    title: 'ThesisMaps: Visual Research Intelligence',
     description: 'Map your literature. Find the gaps. Write with confidence.',
   },
   keywords: ['thesis research', 'literature review', 'knowledge graph', 'PhD tools', 'research gaps', 'citation map'],
