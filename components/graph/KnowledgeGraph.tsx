@@ -13,7 +13,7 @@ import { PaperNode, type PaperNodeData } from './PaperNode';
 import { edgeTypes, type GraphEdgeData } from './EdgeTypes';
 import { GraphControls } from './GraphControls';
 import { nodeColor } from './nodeColor';
-import { radiusMap } from './nodeSize';
+import { radiusMap, nodeBox } from './nodeSize';
 import { useForceLayout } from './useForceLayout';
 import { Badge } from '@/components/ui/Badge';
 import type { GraphData, HeatmapMode, GraphNode, NodeSizeMode, GraphViewMode } from '@/types/graph';
@@ -207,11 +207,16 @@ export function KnowledgeGraph({
   const handleExport = useCallback(() => {
     if (nodes.length === 0) return;
     const pad = 90;
-    const pts = nodes.map((n) => ({ x: n.position.x, y: n.position.y, r: n.data.radius }));
-    const minX = Math.min(...pts.map((p) => p.x - p.r));
-    const minY = Math.min(...pts.map((p) => p.y - p.r));
-    const width = Math.max(...pts.map((p) => p.x + p.r)) - minX + pad * 2;
-    const height = Math.max(...pts.map((p) => p.y + p.r)) - minY + pad * 2;
+    // Positions are centres (nodeOrigin 0.5/0.5), so the bounding box has to
+    // account for each card's own half-width/half-height.
+    const pts = nodes.map((n) => {
+      const box = nodeBox(n.data.radius);
+      return { x: n.position.x, y: n.position.y, hw: box.w / 2, hh: box.h / 2 };
+    });
+    const minX = Math.min(...pts.map((p) => p.x - p.hw));
+    const minY = Math.min(...pts.map((p) => p.y - p.hh));
+    const width = Math.max(...pts.map((p) => p.x + p.hw)) - minX + pad * 2;
+    const height = Math.max(...pts.map((p) => p.y + p.hh)) - minY + pad * 2;
     const pos = new Map(nodes.map((n) => [n.id, { x: n.position.x - minX + pad, y: n.position.y - minY + pad }]));
 
     const edgeSvg = edges
@@ -227,12 +232,15 @@ export function KnowledgeGraph({
 
     const nodeSvg = nodes
       .map((n) => {
-        const p = pos.get(n.id);
-        if (!p) return '';
-        const fill = nodeColor(n.data, heatmapMode, maxCitations, yearRange);
-        const title = (n.data.paper.title || '').slice(0, 34).replace(/[<&>]/g, '');
-        const r = n.data.radius;
-        return `<g><circle cx="${p.x}" cy="${p.y}" r="${r}" fill="${fill}" stroke="#000000" stroke-width="2"/><text x="${p.x}" y="${p.y + r + 14}" text-anchor="middle" fill="#000000" font-family="sans-serif" font-size="10">${title}</text><text x="${p.x}" y="${p.y + r + 26}" text-anchor="middle" fill="#666666" font-family="sans-serif" font-size="9">${n.data.paper.year || ''} - ${n.data.paper.citationCount} cit.</text></g>`;
+        const c = pos.get(n.id);
+        if (!c) return '';
+        const accent = nodeColor(n.data, heatmapMode, maxCitations, yearRange);
+        const { w, h } = nodeBox(n.data.radius);
+        const x = c.x - w / 2;
+        const y = c.y - h / 2;
+        const bar = Math.max(6, Math.round(w * 0.045));
+        const title = (n.data.paper.title || '').slice(0, 36).replace(/[<&>]/g, '');
+        return `<g><rect x="${x}" y="${y}" width="${w}" height="${h}" fill="#FFFFFF" stroke="#000000" stroke-width="2"/><rect x="${x}" y="${y}" width="${bar}" height="${h}" fill="${accent}"/><text x="${x + bar + 10}" y="${y + h * 0.42}" fill="#000000" font-family="sans-serif" font-size="${Math.max(10, Math.min(14, Math.round(h * 0.18)))}" font-weight="600">${title}</text><text x="${x + bar + 10}" y="${y + h * 0.72}" fill="#666666" font-family="sans-serif" font-size="${Math.max(9, Math.round(h * 0.14))}">${n.data.paper.year || ''} - ${n.data.paper.citationCount} cit.</text></g>`;
       })
       .join('');
 
@@ -298,9 +306,9 @@ export function KnowledgeGraph({
       <div className="absolute bottom-4 left-4 z-10 bg-white border-2 border-black p-3 hidden sm:block max-w-[210px]">
         <p className="text-[9px] font-sans font-black uppercase tracking-[0.2em] text-black mb-2">Legend</p>
         <div className="flex items-end gap-1.5 mb-2">
-          <span className="rounded-full border-2 border-black bg-accent" style={{ width: 10, height: 10 }} />
-          <span className="rounded-full border-2 border-black bg-accent" style={{ width: 16, height: 16 }} />
-          <span className="rounded-full border-2 border-black bg-accent" style={{ width: 24, height: 24 }} />
+          <span className="border-2 border-black border-l-4 border-l-accent bg-white" style={{ width: 14, height: 8 }} />
+          <span className="border-2 border-black border-l-4 border-l-accent bg-white" style={{ width: 22, height: 11 }} />
+          <span className="border-2 border-black border-l-4 border-l-accent bg-white" style={{ width: 30, height: 15 }} />
           <span className="text-[9px] font-sans font-bold uppercase tracking-wider text-black/60 ml-1">
             {sizeMode === 'connections' ? 'Connections' : sizeMode === 'uniform' ? 'Uniform' : 'Citations'}
           </span>

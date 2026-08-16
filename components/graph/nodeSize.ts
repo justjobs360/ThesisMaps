@@ -17,6 +17,24 @@ export const MIN_RADIUS = 14;
 export const MAX_RADIUS = 46;
 export const UNIFORM_RADIUS = 22;
 
+/** The original brutalist card proportions, kept as the base size. */
+export const BASE_W = 180;
+export const BASE_H = 70;
+
+/**
+ * Rectangle dimensions for a node.
+ *
+ * Nodes are cards rather than circles — it's the more distinctive look and it
+ * lets the title and metadata live inside the node instead of floating beneath
+ * it. Size still encodes importance: the sqrt-scaled radius is converted to a
+ * uniform scale factor, so both axes grow together and the card keeps its shape.
+ * Clamped so the largest paper stays readable without dwarfing the canvas.
+ */
+export function nodeBox(radius: number): { w: number; h: number } {
+  const scale = Math.min(1.7, Math.max(0.72, radius / UNIFORM_RADIUS));
+  return { w: Math.round(BASE_W * scale), h: Math.round(BASE_H * scale) };
+}
+
 /** How many edges each node has within this graph. */
 export function degreeMap(data: GraphData): Map<string, number> {
   const degrees = new Map<string, number>();

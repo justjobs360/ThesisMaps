@@ -5,7 +5,7 @@ import React, { useCallback, useRef, useState } from 'react';
 /**
  * Honest, dependency-free previews of the product for the marketing page.
  *
- * The graph preview mirrors the real knowledge graph: circles sized by citation
+ * The graph preview mirrors the real knowledge graph: cards sized by citation
  * count, straight centre-to-centre links, and hover-to-isolate. Colour and edge
  * styling come from components/graph/nodeColor.ts and EdgeTypes.tsx so the two
  * can't drift apart.
@@ -26,8 +26,8 @@ const EDGE_SEMANTIC = '#0066FF';
 
 const VIEW_W = 1160;
 const VIEW_H = 380;
-const MIN_R = 16;
-const MAX_R = 46;
+const BASE_W = 180;
+const BASE_H = 70;
 
 type PreviewNode = {
   id: string;
@@ -71,10 +71,13 @@ type Point = { x: number; y: number };
 
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
 
-// Area tracks citations, same sqrt encoding as components/graph/nodeSize.ts.
+// Card size tracks citations on a sqrt scale, mirroring components/graph/nodeSize.ts.
 const MAX_CITATIONS = Math.max(...NODES.map((n) => n.citations));
-const radiusOf = (citations: number) =>
-  MIN_R + (Math.sqrt(citations) / Math.sqrt(MAX_CITATIONS)) * (MAX_R - MIN_R);
+const boxOf = (citations: number) => {
+  const t = Math.sqrt(citations) / Math.sqrt(MAX_CITATIONS);
+  const scale = 0.72 + t * (1.45 - 0.72);
+  return { w: Math.round(BASE_W * scale), h: Math.round(BASE_H * scale) };
+};
 
 const shortCount = (n: number) => (n >= 1000 ? `${Math.round(n / 1000)}k` : `${n}`);
 
@@ -91,8 +94,8 @@ function neighboursOf(id: string): Set<string> {
 /**
  * Frame around a preview.
  *
- * `dark` only for the graph, where a dark canvas is what makes the coloured
- * circles and their links read. The panel previews are white cards that already
+ * `dark` only for the graph, where a dark canvas is what makes the cards and
+ * their links read. The panel previews are white cards that already
  * carry their own black borders, so a dark box around them just adds a heavy
  * container without conveying anything.
  */
@@ -170,7 +173,7 @@ function GraphPreview({ animated, interactive }: { animated: boolean; interactiv
       const d = drag.current;
       if (!d) return;
       const scale = unitsPerPixel();
-      const r = MAX_R;
+      const r = BASE_W / 2;
       const x = clamp(d.origin.x + (e.clientX - d.startX) * scale, r, VIEW_W - r);
       const y = clamp(d.origin.y + (e.clientY - d.startY) * scale, r, VIEW_H - r - 24);
       setPositions((prev) => ({ ...prev, [d.id]: { x, y } }));
@@ -189,7 +192,7 @@ function GraphPreview({ animated, interactive }: { animated: boolean; interactiv
       className="w-full h-full"
       preserveAspectRatio="xMidYMid meet"
     >
-      {/* Edges first so the circles paint over their endpoints — that's what lets
+      {/* Edges first so the cards paint over their endpoints — that's what lets
           a node drift or be dragged without a line appearing to detach. */}
       <g>
         {EDGES.map((e, i) => {
@@ -226,9 +229,10 @@ function GraphPreview({ animated, interactive }: { animated: boolean; interactiv
       {NODES.map((n) => {
         const p = positions[n.id] ?? { x: n.x, y: n.y };
         const drifting = animated && !grabbed.has(n.id) && !active;
-        const r = radiusOf(n.citations);
+        const { w, h } = boxOf(n.citations);
         const isActive = active ? active.has(n.id) : false;
         const isFocus = hovered === n.id;
+        const bar = Math.max(6, Math.round(w * 0.045));
         return (
           <g
             key={n.id}
@@ -256,32 +260,31 @@ function GraphPreview({ animated, interactive }: { animated: boolean; interactiv
             onMouseEnter={() => setHovered(n.id)}
             onMouseLeave={() => setHovered(null)}
           >
-            <circle
-              cx={p.x}
-              cy={p.y}
-              r={r}
-              fill={n.accent}
-              stroke={isFocus ? '#FFFFFF' : 'rgba(255,255,255,0.55)'}
-              strokeWidth={isFocus ? 3 : 2}
-              style={{ transition: 'stroke-width 0.15s' }}
-            />
-            <text
-              x={p.x}
-              y={p.y + r + 16}
-              textAnchor="middle"
+            <rect
+              x={p.x - w / 2}
+              y={p.y - h / 2}
+              width={w}
+              height={h}
               fill="#FFFFFF"
-              fontSize={12}
+              stroke="#000000"
+              strokeWidth={isFocus ? 3 : 2}
+            />
+            <rect x={p.x - w / 2} y={p.y - h / 2} width={bar} height={h} fill={n.accent} />
+            <text
+              x={p.x - w / 2 + bar + 10}
+              y={p.y - h / 2 + h * 0.42}
+              fill="#000000"
+              fontSize={Math.max(10, Math.min(14, Math.round(h * 0.18)))}
               fontWeight={600}
               fontFamily="var(--font-dm-sans), system-ui, sans-serif"
             >
-              {n.title.length > 26 ? `${n.title.slice(0, 25)}…` : n.title}
+              {n.title.length > 24 ? `${n.title.slice(0, 23)}…` : n.title}
             </text>
             <text
-              x={p.x}
-              y={p.y + r + 30}
-              textAnchor="middle"
-              fill="rgba(255,255,255,0.45)"
-              fontSize={10}
+              x={p.x - w / 2 + bar + 10}
+              y={p.y - h / 2 + h * 0.72}
+              fill="#666666"
+              fontSize={Math.max(9, Math.round(h * 0.14))}
               fontFamily="var(--font-dm-sans), system-ui, sans-serif"
             >
               {n.year} · {shortCount(n.citations)} cit.
