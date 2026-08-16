@@ -114,7 +114,9 @@ export default function LandingPage() {
 
           {/* Live product preview: dark canvas, ambient drift, and draggable
               paper nodes — the same interaction the real graph offers. */}
-          <div className="mt-12 md:mt-16 h-64 md:h-[26rem]">
+          {/* Height tracks the preview's 1080x550 canvas so the graph fills the
+              frame instead of letterboxing with empty gutters either side. */}
+          <div className="mt-12 md:mt-16 h-72 md:h-[32rem]">
             <ProductPreview kind="graph" animated interactive />
           </div>
         </section>

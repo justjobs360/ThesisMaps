@@ -24,8 +24,8 @@ const CITED = '#94A3B8';
 const EDGE_CITATION = '#64748B';
 const EDGE_SEMANTIC = '#0066FF';
 
-const VIEW_W = 1160;
-const VIEW_H = 380;
+const VIEW_W = 1080;
+const VIEW_H = 550;
 const BASE_W = 180;
 const BASE_H = 70;
 
@@ -45,13 +45,15 @@ type PreviewNode = {
 };
 
 const NODES: PreviewNode[] = [
-  { id: 'a', x: 110, y: 105, accent: SEED,        title: 'Attention Is All You Need',  year: 2017, citations: 112000, dx: 7,  dy: -6, dur: 19, delay: 0 },
-  { id: 'b', x: 360, y: 60,  accent: CITED,       title: 'Neural Machine Translation', year: 2015, citations: 24000,  dx: -6, dy: 7,  dur: 23, delay: 1.5 },
-  { id: 'c', x: 380, y: 240, accent: INFLUENTIAL, title: 'Deep Residual Learning',     year: 2016, citations: 210000, dx: 6,  dy: 6,  dur: 21, delay: 0.8 },
-  { id: 'd', x: 650, y: 140, accent: CITING,      title: 'BERT: Pre-training',         year: 2019, citations: 88000,  dx: -7, dy: -5, dur: 25, delay: 2.2 },
-  { id: 'e', x: 700, y: 300, accent: CITED,       title: 'Low-Resource NMT Survey',    year: 2021, citations: 1400,   dx: 5,  dy: -7, dur: 20, delay: 1.1 },
-  { id: 'f', x: 950, y: 90,  accent: SEED,        title: 'Scaling Laws for LMs',       year: 2020, citations: 6200,   dx: -5, dy: 6,  dur: 24, delay: 0.4 },
-  { id: 'g', x: 960, y: 265, accent: CITING,      title: 'Transformer Variants',       year: 2022, citations: 900,    dx: 6,  dy: 5,  dur: 22, delay: 1.9 },
+  // Positions are verified to clear each other at full card size with room for
+  // the drift amplitude, so cards never collide however far they wander.
+  { id: 'a', x: 200, y: 150, accent: SEED,        title: 'Attention Is All You Need',  year: 2017, citations: 112000, dx: 16,  dy: -12, dur: 26, delay: 0 },
+  { id: 'b', x: 520, y: 110, accent: CITED,       title: 'Neural Machine Translation', year: 2015, citations: 24000,  dx: -13, dy: 15,  dur: 31, delay: 2.4 },
+  { id: 'c', x: 210, y: 360, accent: INFLUENTIAL, title: 'Deep Residual Learning',     year: 2016, citations: 210000, dx: 12,  dy: 14,  dur: 29, delay: 1.2 },
+  { id: 'd', x: 560, y: 290, accent: CITING,      title: 'BERT: Pre-training',         year: 2019, citations: 88000,  dx: -15, dy: -11, dur: 34, delay: 3.1 },
+  { id: 'e', x: 520, y: 450, accent: CITED,       title: 'Low-Resource NMT Survey',    year: 2021, citations: 1400,   dx: 14,  dy: -16, dur: 27, delay: 1.8 },
+  { id: 'f', x: 900, y: 180, accent: SEED,        title: 'Scaling Laws for LMs',       year: 2020, citations: 6200,   dx: -12, dy: 15,  dur: 32, delay: 0.7 },
+  { id: 'g', x: 920, y: 380, accent: CITING,      title: 'Transformer Variants',       year: 2022, citations: 900,    dx: 15,  dy: 12,  dur: 28, delay: 2.9 },
 ];
 
 type PreviewEdge = { from: string; to: string; semantic?: boolean };
@@ -120,10 +122,28 @@ function PreviewFrame({
       aria-label={label}
     >
       {dark ? (
-        <div
-          className="absolute inset-0 opacity-20 bg-[radial-gradient(#ffffff_1px,transparent_1px)] [background-size:20px_20px]"
-          aria-hidden
-        />
+        <>
+          {/* Layered canvas rather than flat black: a fine dot grid for texture,
+              a soft accent bloom so the composition has a light source, and a
+              vignette to settle the edges. */}
+          <div
+            className="absolute inset-0 opacity-[0.13] bg-[radial-gradient(#ffffff_1px,transparent_1px)] [background-size:26px_26px]"
+            aria-hidden
+          />
+          <div
+            className="absolute inset-0 opacity-70"
+            style={{
+              background:
+                'radial-gradient(70% 55% at 22% 18%, rgba(0,102,255,0.22) 0%, transparent 62%), radial-gradient(55% 50% at 88% 82%, rgba(0,102,255,0.12) 0%, transparent 60%)',
+            }}
+            aria-hidden
+          />
+          <div
+            className="absolute inset-0"
+            style={{ background: 'radial-gradient(120% 100% at 50% 50%, transparent 45%, rgba(0,0,0,0.55) 100%)' }}
+            aria-hidden
+          />
+        </>
       ) : null}
       <div className="relative w-full h-full">{children}</div>
       {hint ? (
@@ -209,9 +229,11 @@ function GraphPreview({ animated, interactive }: { animated: boolean; interactiv
               x2={b.x}
               y2={b.y}
               stroke={touches ? '#FFFFFF' : e.semantic ? EDGE_SEMANTIC : EDGE_CITATION}
-              strokeWidth={touches ? 2.5 : 1.5}
-              strokeDasharray={e.semantic ? '6 3' : undefined}
-              opacity={dim ? 0.08 : touches ? 1 : 0.5}
+              // Heavier on a dark canvas — hairlines disappear against black.
+              strokeWidth={touches ? 3 : e.semantic ? 2.25 : 2}
+              strokeDasharray={e.semantic ? '7 5' : undefined}
+              strokeLinecap="round"
+              opacity={dim ? 0.07 : touches ? 1 : e.semantic ? 0.75 : 0.55}
               className={animated && e.semantic && !active ? 'tm-pulse' : undefined}
               style={
                 {
@@ -260,6 +282,16 @@ function GraphPreview({ animated, interactive }: { animated: boolean; interactiv
             onMouseEnter={() => setHovered(n.id)}
             onMouseLeave={() => setHovered(null)}
           >
+            {/* Hard offset shadow — the brutalist equivalent of elevation, and
+                what separates a white card from a black canvas. */}
+            <rect
+              x={p.x - w / 2 + (isFocus ? 7 : 5)}
+              y={p.y - h / 2 + (isFocus ? 7 : 5)}
+              width={w}
+              height={h}
+              fill={isFocus ? '#0066FF' : '#000000'}
+              opacity={isFocus ? 0.9 : 0.55}
+            />
             <rect
               x={p.x - w / 2}
               y={p.y - h / 2}
@@ -267,7 +299,7 @@ function GraphPreview({ animated, interactive }: { animated: boolean; interactiv
               height={h}
               fill="#FFFFFF"
               stroke="#000000"
-              strokeWidth={isFocus ? 3 : 2}
+              strokeWidth={2}
             />
             <rect x={p.x - w / 2} y={p.y - h / 2} width={bar} height={h} fill={n.accent} />
             <text
