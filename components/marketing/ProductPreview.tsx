@@ -5,7 +5,7 @@ import React, { useCallback, useRef, useState } from 'react';
 /**
  * Honest, dependency-free previews of the product for the marketing page.
  *
- * The graph preview mirrors the real knowledge graph: cards sized by citation
+ * The graph preview mirrors the real knowledge graph: circles sized by citation
  * count, straight centre-to-centre links, and hover-to-isolate. Colour and edge
  * styling come from components/graph/nodeColor.ts and EdgeTypes.tsx so the two
  * can't drift apart.
@@ -26,8 +26,8 @@ const EDGE_SEMANTIC = '#0066FF';
 
 const VIEW_W = 1080;
 const VIEW_H = 550;
-const BASE_W = 180;
-const BASE_H = 70;
+const MIN_R = 18;
+const MAX_R = 54;
 
 type PreviewNode = {
   id: string;
@@ -45,8 +45,8 @@ type PreviewNode = {
 };
 
 const NODES: PreviewNode[] = [
-  // Positions are verified to clear each other at full card size with room for
-  // the drift amplitude, so cards never collide however far they wander.
+  // Positions are verified to clear each other at full circle size including the
+  // label block beneath, with room for the drift, so nodes never collide.
   { id: 'a', x: 200, y: 150, accent: SEED,        title: 'Attention Is All You Need',  year: 2017, citations: 112000, dx: 16,  dy: -12, dur: 26, delay: 0 },
   { id: 'b', x: 520, y: 110, accent: CITED,       title: 'Neural Machine Translation', year: 2015, citations: 24000,  dx: -13, dy: 15,  dur: 31, delay: 2.4 },
   { id: 'c', x: 210, y: 360, accent: INFLUENTIAL, title: 'Deep Residual Learning',     year: 2016, citations: 210000, dx: 12,  dy: 14,  dur: 29, delay: 1.2 },
@@ -73,13 +73,10 @@ type Point = { x: number; y: number };
 
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
 
-// Card size tracks citations on a sqrt scale, mirroring components/graph/nodeSize.ts.
+// Area tracks citations on a sqrt scale, mirroring components/graph/nodeSize.ts.
 const MAX_CITATIONS = Math.max(...NODES.map((n) => n.citations));
-const boxOf = (citations: number) => {
-  const t = Math.sqrt(citations) / Math.sqrt(MAX_CITATIONS);
-  const scale = 0.72 + t * (1.45 - 0.72);
-  return { w: Math.round(BASE_W * scale), h: Math.round(BASE_H * scale) };
-};
+const radiusOf = (citations: number) =>
+  MIN_R + (Math.sqrt(citations) / Math.sqrt(MAX_CITATIONS)) * (MAX_R - MIN_R);
 
 const shortCount = (n: number) => (n >= 1000 ? `${Math.round(n / 1000)}k` : `${n}`);
 
@@ -96,7 +93,7 @@ function neighboursOf(id: string): Set<string> {
 /**
  * Frame around a preview.
  *
- * `dark` only for the graph, where a dark canvas is what makes the cards and
+ * `dark` only for the graph, where a dark canvas is what makes the nodes and
  * their links read. The panel previews are white cards that already
  * carry their own black borders, so a dark box around them just adds a heavy
  * container without conveying anything.
@@ -193,7 +190,7 @@ function GraphPreview({ animated, interactive }: { animated: boolean; interactiv
       const d = drag.current;
       if (!d) return;
       const scale = unitsPerPixel();
-      const r = BASE_W / 2;
+      const r = MAX_R + 40;
       const x = clamp(d.origin.x + (e.clientX - d.startX) * scale, r, VIEW_W - r);
       const y = clamp(d.origin.y + (e.clientY - d.startY) * scale, r, VIEW_H - r - 24);
       setPositions((prev) => ({ ...prev, [d.id]: { x, y } }));
@@ -212,7 +209,7 @@ function GraphPreview({ animated, interactive }: { animated: boolean; interactiv
       className="w-full h-full"
       preserveAspectRatio="xMidYMid meet"
     >
-      {/* Edges first so the cards paint over their endpoints — that's what lets
+      {/* Edges first so the circles paint over their endpoints — that's what lets
           a node drift or be dragged without a line appearing to detach. */}
       <g>
         {EDGES.map((e, i) => {
@@ -251,10 +248,9 @@ function GraphPreview({ animated, interactive }: { animated: boolean; interactiv
       {NODES.map((n) => {
         const p = positions[n.id] ?? { x: n.x, y: n.y };
         const drifting = animated && !grabbed.has(n.id) && !active;
-        const { w, h } = boxOf(n.citations);
+        const r = radiusOf(n.citations);
         const isActive = active ? active.has(n.id) : false;
         const isFocus = hovered === n.id;
-        const bar = Math.max(6, Math.round(w * 0.045));
         return (
           <g
             key={n.id}
@@ -282,41 +278,33 @@ function GraphPreview({ animated, interactive }: { animated: boolean; interactiv
             onMouseEnter={() => setHovered(n.id)}
             onMouseLeave={() => setHovered(null)}
           >
-            {/* Hard offset shadow — the brutalist equivalent of elevation, and
-                what separates a white card from a black canvas. */}
-            <rect
-              x={p.x - w / 2 + (isFocus ? 7 : 5)}
-              y={p.y - h / 2 + (isFocus ? 7 : 5)}
-              width={w}
-              height={h}
-              fill={isFocus ? '#0066FF' : '#000000'}
-              opacity={isFocus ? 0.9 : 0.55}
+            {/* Hard offset shadow: brutalist elevation, no blur. */}
+            <circle cx={p.x + 5} cy={p.y + 5} r={r} fill={isFocus ? '#0066FF' : '#000000'} opacity={isFocus ? 0.95 : 0.6} />
+            <circle
+              cx={p.x}
+              cy={p.y}
+              r={r}
+              fill={n.accent}
+              stroke="#FFFFFF"
+              strokeWidth={isFocus ? 4 : 3}
             />
-            <rect
-              x={p.x - w / 2}
-              y={p.y - h / 2}
-              width={w}
-              height={h}
-              fill="#FFFFFF"
-              stroke="#000000"
-              strokeWidth={2}
-            />
-            <rect x={p.x - w / 2} y={p.y - h / 2} width={bar} height={h} fill={n.accent} />
             <text
-              x={p.x - w / 2 + bar + 10}
-              y={p.y - h / 2 + h * 0.42}
-              fill="#000000"
-              fontSize={Math.max(10, Math.min(14, Math.round(h * 0.18)))}
-              fontWeight={600}
+              x={p.x}
+              y={p.y + r + 20}
+              textAnchor="middle"
+              fill="#FFFFFF"
+              fontSize={12}
+              fontWeight={700}
               fontFamily="var(--font-dm-sans), system-ui, sans-serif"
             >
               {n.title.length > 24 ? `${n.title.slice(0, 23)}…` : n.title}
             </text>
             <text
-              x={p.x - w / 2 + bar + 10}
-              y={p.y - h / 2 + h * 0.72}
-              fill="#666666"
-              fontSize={Math.max(9, Math.round(h * 0.14))}
+              x={p.x}
+              y={p.y + r + 35}
+              textAnchor="middle"
+              fill="rgba(255,255,255,0.5)"
+              fontSize={10}
               fontFamily="var(--font-dm-sans), system-ui, sans-serif"
             >
               {n.year} · {shortCount(n.citations)} cit.

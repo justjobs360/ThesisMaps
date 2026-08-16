@@ -11,7 +11,7 @@ import {
   forceY,
   type SimulationNodeDatum,
 } from 'd3-force';
-import { nodeBox } from './nodeSize';
+import { keepOutRadius } from './nodeSize';
 import type { GraphData, GraphViewMode } from '@/types/graph';
 
 /**
@@ -112,15 +112,9 @@ export function useForceLayout(
       // Charge scales with radius so large nodes claim proportionate space
       // instead of swallowing their neighbours.
       .force('charge', forceManyBody<SimNode>().strength((d) => -400 - d.radius * 20))
-      // Hard separation: cards must never overlap, whatever the other forces
-      // want. Nodes are rectangles, so the keep-out radius comes from the card's
-      // width (the dominant axis) rather than the sizing radius, plus padding.
-      .force(
-        'collide',
-        forceCollide<SimNode>()
-          .radius((d) => nodeBox(d.radius).w / 2 + 34)
-          .strength(1)
-      )
+      // Hard separation: neither the circles nor the labels beneath them may
+      // overlap, whatever the other forces want.
+      .force('collide', forceCollide<SimNode>().radius((d) => keepOutRadius(d.radius)).strength(1))
       .stop();
 
     if (viewMode === 'timeline') {

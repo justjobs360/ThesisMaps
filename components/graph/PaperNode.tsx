@@ -3,16 +3,16 @@ import { Handle, Position } from 'reactflow';
 import type { NodeProps } from 'reactflow';
 import type { GraphNode, HeatmapMode } from '@/types/graph';
 import { nodeColor } from './nodeColor';
-import { nodeBox } from './nodeSize';
 
 /**
- * A paper as a hard-edged card, sized by importance.
+ * A paper as a circle, sized by importance.
  *
- * Card rather than circle: it's the more distinctive look, and it keeps the
- * title and metadata *inside* the node instead of floating underneath, which is
- * what forced labels to be hidden when the canvas got busy. Size carries the
- * signal that the old fixed 180x70 grid threw away — an 11,000-citation paper is
- * now visibly bigger than one with none.
+ * Circles because edges can meet them from any direction without the elbowing
+ * that fixed left/right handles forced on rectangles, and because area reads as
+ * magnitude — which is the point of sizing by citations or connectedness.
+ *
+ * Brutalist rather than soft: flat fill, heavy black outline, and a hard offset
+ * shadow for elevation. No gradients, no blur, no glow.
  */
 export type PaperNodeData = GraphNode & {
   heatmapMode: HeatmapMode;
@@ -23,21 +23,26 @@ export type PaperNodeData = GraphNode & {
   dimmed: boolean;
   /** This node is the selection, or directly connected to it. */
   highlighted: boolean;
+  /** Labels are suppressed for small nodes once the canvas gets busy. */
   showLabel: boolean;
 };
 
-function PaperNodeImpl({ data, selected }: NodeProps<PaperNodeData>) {
-  const accent = nodeColor(data, data.heatmapMode, data.maxCitations, data.yearRange);
-  const { w, h } = nodeBox(data.radius);
-  const isFocus = selected || data.highlighted;
+const SHADOW_OFFSET = 5;
 
-  // Below this the card can't fit two lines plus the meta row.
-  const showMeta = h >= 60;
+function PaperNodeImpl({ data, selected }: NodeProps<PaperNodeData>) {
+  const fill = nodeColor(data, data.heatmapMode, data.maxCitations, data.yearRange);
+  const r = data.radius;
+  const size = r * 2;
+  const isFocus = selected || data.highlighted;
+  const border = isFocus ? 4 : 3;
 
   return (
-    <div className="relative transition-opacity duration-200" style={{ opacity: data.dimmed ? 0.12 : 1 }}>
+    <div
+      className="relative flex flex-col items-center transition-opacity duration-200"
+      style={{ opacity: data.dimmed ? 0.12 : 1 }}
+    >
       {/* Both handles sit dead-centre and hidden, so edges run centre-to-centre
-          and their endpoints are covered by the card itself. */}
+          and their endpoints are covered by the circle itself. */}
       <Handle
         type="target"
         position={Position.Left}
@@ -45,51 +50,54 @@ function PaperNodeImpl({ data, selected }: NodeProps<PaperNodeData>) {
         style={{ left: '50%', top: '50%', transform: 'translate(-50%, -50%)' }}
       />
 
-      <div
-        className="bg-white cursor-pointer transition-all duration-150 overflow-hidden flex flex-col justify-center"
-        style={{
-          width: w,
-          height: h,
-          // Brutalist: solid black edges, a thick colour bar for the heatmap, and
-          // a hard offset shadow on focus rather than a soft glow.
-          border: '2px solid #000000',
-          borderLeft: `${Math.max(6, Math.round(w * 0.045))}px solid ${accent}`,
-          boxShadow: isFocus ? '4px 4px 0 #000000' : undefined,
-          outline: isFocus ? '2px solid #000000' : undefined,
-          padding: `${Math.round(h * 0.12)}px ${Math.round(w * 0.06)}px`,
-        }}
-        title={`${data.paper.title} (${data.paper.year || 'n.d.'}) — ${data.paper.citationCount.toLocaleString()} citations`}
-      >
-        <p
-          className={[
-            'text-black font-sans leading-snug line-clamp-2',
-            isFocus ? 'font-black' : 'font-semibold',
-          ].join(' ')}
-          style={{ fontSize: Math.max(10, Math.min(15, Math.round(h * 0.19))) }}
-        >
-          {data.paper.title}
-        </p>
-        {showMeta ? (
-          <div className="flex items-center gap-1.5 mt-1">
-            <span className="text-black/50 font-sans" style={{ fontSize: Math.max(9, Math.round(h * 0.14)) }}>
-              {data.paper.year || '—'}
-            </span>
-            <span className="text-black/25 font-sans" style={{ fontSize: Math.max(9, Math.round(h * 0.14)) }}>
-              ·
-            </span>
-            <span className="text-black/50 font-sans" style={{ fontSize: Math.max(9, Math.round(h * 0.14)) }}>
-              {data.paper.citationCount.toLocaleString()} cit.
-            </span>
-          </div>
+      <div className="relative" style={{ width: size, height: size }}>
+        {/* Hard offset shadow: brutalist elevation, no blur. */}
+        <span
+          className="absolute rounded-full"
+          style={{
+            width: size,
+            height: size,
+            left: SHADOW_OFFSET,
+            top: SHADOW_OFFSET,
+            backgroundColor: isFocus ? '#0066FF' : '#000000',
+          }}
+          aria-hidden
+        />
+        <span
+          className="absolute rounded-full cursor-pointer transition-all duration-150"
+          style={{
+            width: size,
+            height: size,
+            left: 0,
+            top: 0,
+            backgroundColor: fill,
+            border: `${border}px solid #000000`,
+          }}
+          title={`${data.paper.title} (${data.paper.year || 'n.d.'}) — ${data.paper.citationCount.toLocaleString()} citations`}
+        />
+        {data.isBookmarked ? (
+          <span
+            className="absolute w-3 h-3 border-2 border-black bg-white"
+            style={{ top: -4, right: -4 }}
+            aria-hidden
+          />
         ) : null}
       </div>
 
-      {data.isBookmarked ? (
-        <span
-          className="absolute -top-1.5 -right-1.5 w-3 h-3 border-2 border-black"
-          style={{ backgroundColor: accent }}
-          aria-hidden
-        />
+      {data.showLabel || isFocus ? (
+        <div className="mt-2 w-[136px] text-center pointer-events-none">
+          <p
+            className={[
+              'text-[10px] font-sans uppercase tracking-tight leading-tight line-clamp-2',
+              isFocus ? 'font-black text-black' : 'font-bold text-black/75',
+            ].join(' ')}
+          >
+            {data.paper.title}
+          </p>
+          <p className="text-[9px] font-sans font-bold text-black/40 mt-0.5 tracking-wider">
+            {data.paper.year || '—'} · {data.paper.citationCount.toLocaleString()}
+          </p>
+        </div>
       ) : null}
 
       <Handle
@@ -102,5 +110,5 @@ function PaperNodeImpl({ data, selected }: NodeProps<PaperNodeData>) {
   );
 }
 
-// Memoised so recolouring or selecting doesn't re-render every card.
+// Memoised so recolouring or selecting doesn't re-render every node.
 export const PaperNode = React.memo(PaperNodeImpl);
