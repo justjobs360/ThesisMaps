@@ -68,6 +68,59 @@
   50%      { opacity: 0.6; }
 }
 
+/* Typing caret for the hero headline. */
+@keyframes tm-caret-blink {
+  0%, 45%   { opacity: 1; }
+  55%, 100% { opacity: 0; }
+}
+
+.tm-caret {
+  display: inline-block;
+  width: 0.06em;
+  height: 0.78em;
+  margin-left: 0.06em;
+  vertical-align: baseline;
+  background: currentColor;
+  animation: tm-caret-blink 1.1s steps(1, end) infinite;
+}
+
+/**
+ * Flow along a selected connection. The dash pattern travels source -> target so
+ * a link reads as directional without arrowheads, which would fight the
+ * geometry. Paired with a large dasharray set on the path itself.
+ */
+@keyframes tm-flow {
+  from { stroke-dashoffset: var(--tm-flow-len, 40); }
+  to   { stroke-dashoffset: 0; }
+}
+
+.tm-flow {
+  animation: tm-flow var(--tm-dur, 1.1s) linear infinite;
+}
+
+/** One-shot entrance: edges draw themselves in on first paint. */
+@keyframes tm-draw {
+  from { stroke-dashoffset: var(--tm-draw-len, 600); }
+  to   { stroke-dashoffset: 0; }
+}
+
+.tm-draw {
+  animation: tm-draw 1s ease-out var(--tm-delay, 0s) both;
+}
+
+/** One-shot entrance: nodes settle in with a brief accent halo. */
+@keyframes tm-enter {
+  from { transform: scale(0.5); opacity: 0; }
+  60%  { transform: scale(1.06); opacity: 1; }
+  to   { transform: scale(1); opacity: 1; }
+}
+
+.tm-enter {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: tm-enter 0.55s cubic-bezier(0.22, 1, 0.36, 1) var(--tm-delay, 0s) both;
+}
+
 .tm-drift {
   animation: tm-drift var(--tm-dur, 18s) ease-in-out infinite alternate;
   animation-delay: var(--tm-delay, 0s);
@@ -78,11 +131,22 @@
   animation-delay: var(--tm-delay, 0s);
 }
 
-/* Respect the OS setting — hold the scene completely still. */
+/* Respect the OS setting — hold the scene completely still, and render every
+   one-shot entrance in its settled state rather than skipping it mid-way. */
 @media (prefers-reduced-motion: reduce) {
   .tm-drift,
-  .tm-pulse {
+  .tm-pulse,
+  .tm-flow,
+  .tm-caret {
     animation: none !important;
+  }
+
+  .tm-draw,
+  .tm-enter {
+    animation: none !important;
+    stroke-dashoffset: 0 !important;
+    transform: none !important;
+    opacity: 1 !important;
   }
 }
 

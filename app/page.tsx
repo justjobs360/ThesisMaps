@@ -4,9 +4,9 @@ import {
   GitFork, AlignLeft, Lightbulb, Shield, Clock, Search, Users,
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
-import { WordCycler } from '@/components/ui/WordCycler';
+import { WordCycler, TypingDots } from '@/components/ui/WordCycler';
 import { MarketingHeader } from '@/components/layout/MarketingHeader';
-import { ProductPreview } from '@/components/marketing/ProductPreview';
+import { ProductPreview, GraphLegend } from '@/components/marketing/ProductPreview';
 import { MarketingFooter } from '@/components/layout/MarketingFooter';
 
 export const metadata: Metadata = {
@@ -36,7 +36,7 @@ const JSON_LD = JSON.stringify({
 const FEATURES = [
   {
     label: 'Knowledge Graph',
-    preview: 'graph' as const,
+    preview: 'sources' as const,
     heading: 'See how your literature connects',
     body: 'Visualise citation networks, semantic similarity, and co-authorship links across hundreds of papers, all on a single interactive canvas.',
     icon: GitFork,
@@ -84,59 +84,67 @@ export default function LandingPage() {
 
       <main>
         {/* Hero */}
-        <section className="pt-32 md:pt-48 pb-16 md:pb-24 px-6 max-w-6xl mx-auto text-left relative" aria-labelledby="hero-heading">
+        <section className="pt-28 md:pt-40 pb-16 md:pb-24 px-6 max-w-6xl mx-auto text-left relative" aria-labelledby="hero-heading">
           <div className="absolute top-0 left-0 w-full h-full -z-10 opacity-40 mix-blend-multiply pointer-events-none bg-[radial-gradient(circle_at_top_right,_var(--tw-gradient-stops))] from-accent/5 via-transparent to-transparent"></div>
-          <p className="text-[10px] md:text-sm font-sans font-bold uppercase tracking-[0.3em] text-accent mb-8 leading-none">Visual Research Intelligence</p>
-          <h1 id="hero-heading" className="font-serif text-[clamp(2.5rem,8vw,5.5rem)] text-text-primary mb-8 md:mb-12 leading-[1.1] tracking-tight">
-            The visual way to … <br className="hidden md:block" />
-            {/* Lowercase + slightly smaller: the cycling phrase reads as a
-                continuation of the line above, not a new sentence. */}
+          <p className="text-[10px] md:text-sm font-sans font-bold uppercase tracking-[0.3em] text-accent mb-5 leading-none">Visual Research Intelligence</p>
+          <h1 id="hero-heading" className="font-serif text-[clamp(2.5rem,8vw,5.5rem)] text-text-primary mb-6 leading-[1.1] tracking-tight">
+            The visual way to <TypingDots className="text-accent" /> <br className="hidden md:block" />
+            {/* Same family, size and weight as the roman line above; only the
+                colour differs. It previously differed on four axes at once
+                (italic, light, 0.95em, muted grey), which is what read as
+                several competing fonts in one headline. */}
             <WordCycler
               words={['map your literature', 'find the gaps', 'write with confidence']}
-              className="italic font-light text-text-muted text-[0.95em]"
+              className="text-accent"
             />
           </h1>
-          <p className="max-w-2xl font-sans text-text-muted text-lg md:text-2xl leading-relaxed mb-12 md:mb-16">
+          <p className="max-w-2xl font-sans text-text-muted text-lg md:text-xl leading-relaxed mb-8">
             Built exclusively for MSc students, PhD candidates and researchers. Transform the painful process of literature reviews into an interactive, visual journey.
           </p>
           <div className="flex flex-col sm:flex-row items-start gap-6">
             <Link href="/signup" className="w-full sm:w-auto">
-              <Button size="lg" variant="primary" pill className="w-full sm:w-auto px-10 h-14 text-base tracking-widest bg-black text-white hover:bg-accent border-none shadow-impact">
+              <Button size="lg" variant="primary" className="w-full sm:w-auto px-10 h-14 text-base tracking-widest bg-black text-white hover:bg-accent border-none shadow-impact">
                 Start for free
               </Button>
             </Link>
             <Link href="/login" className="w-full sm:w-auto">
-              <Button size="lg" variant="secondary" pill className="w-full sm:w-auto px-10 h-14 text-base tracking-widest bg-white text-black border-2 border-black hover:bg-black hover:text-white shadow-impact">
+              <Button size="lg" variant="secondary" className="w-full sm:w-auto px-10 h-14 text-base tracking-widest bg-white text-black border-2 border-black hover:bg-black hover:text-white shadow-impact">
                 Sign in
               </Button>
             </Link>
           </div>
 
-          {/* Live product preview: dark canvas, ambient drift, and draggable
-              paper nodes — the same interaction the real graph offers. */}
-          {/* Height tracks the preview's 1080x550 canvas so the graph fills the
-              frame instead of letterboxing with empty gutters either side. */}
-          <div className="mt-12 md:mt-16 h-72 md:h-[32rem]">
+          {/* Unframed, sitting directly on the page so it reads as embedded
+              rather than a screenshot. aspect-[1080/550] matches the SVG viewBox
+              exactly — a fixed height letterboxed it, leaving ~50px of dead
+              gutter each side and making the graph look narrower than the text
+              above it even though both are clamped to the same width. */}
+          <div className="mt-10 md:mt-12 w-full aspect-[1080/550]">
             <ProductPreview kind="graph" animated interactive />
           </div>
+          <GraphLegend />
         </section>
 
         {/* Thesis Stages */}
-        <section id="how-it-works" className="py-16 border-y-2 border-black bg-white" aria-labelledby="stages-heading">
-          <div className="max-w-6xl mx-auto px-6">
+        <section id="how-it-works" className="py-16 bg-white" aria-labelledby="stages-heading">
+          <div className="max-w-6xl mx-auto px-6 border-y-2 border-black py-12">
             <p id="stages-heading" className="text-xs font-sans font-bold uppercase tracking-[0.2em] text-black text-center mb-8">Works across every thesis stage</p>
             {/* Grid rather than flex-wrap: flex sized each pill to its label, so
                 "DATA" was half the width of "METHODOLOGY". A grid makes all seven
-                identical at every breakpoint. Non-interactive by design, so no
-                hover state (it also can't be reached on touch). */}
+                identical at every breakpoint. Still not clickable — the hover
+                inversion is visual life only, hence cursor-default. */}
             <ol className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
               {STAGES.map((stage, i) => (
                 <li
                   key={stage}
-                  className="flex flex-col items-center justify-center gap-1 px-3 py-3 border-2 border-black bg-white font-sans text-center"
+                  className="group flex items-center justify-center gap-2 px-3 py-3 border-2 border-black bg-white font-sans text-center cursor-default transition-colors duration-150 hover:bg-black"
                 >
-                  <span className="text-accent text-[10px] font-bold">{(i + 1).toString().padStart(2, '0')}</span>
-                  <span className="text-[11px] md:text-xs font-bold text-black leading-tight">{stage.toUpperCase()}</span>
+                  <span className="text-accent text-[10px] font-bold group-hover:text-white transition-colors duration-150">
+                    {(i + 1).toString().padStart(2, '0')}
+                  </span>
+                  <span className="text-[11px] md:text-xs font-bold text-black leading-tight group-hover:text-white transition-colors duration-150">
+                    {stage.toUpperCase()}
+                  </span>
                 </li>
               ))}
             </ol>
@@ -184,7 +192,7 @@ export default function LandingPage() {
         </section>
 
         {/* Differentiators */}
-        <section className="py-24 bg-white border-y-2 border-black" aria-labelledby="differentiators-heading">
+        <section className="py-24 bg-white" aria-labelledby="differentiators-heading">
           <div className="max-w-6xl mx-auto px-6">
             <h2 id="differentiators-heading" className="font-serif text-display-sm text-text-primary text-center mb-16">
               Built differently, for researchers
