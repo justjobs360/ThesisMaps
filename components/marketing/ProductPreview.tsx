@@ -33,35 +33,59 @@ type PreviewNode = {
   title: string;
   year: number;
   citations: number;
-  /** Ambient drift offset + timing, so each node moves independently. */
+  /** seed = the paper you start from; the rings are how far out the work sits. */
+  ring: 'seed' | 'inner' | 'outer';
+  /** Only the seed and the three most-cited carry a resting label. */
+  label: boolean;
   dx: number;
   dy: number;
   dur: number;
 };
 
 const NODES: PreviewNode[] = [
-  // Positions verified to clear each other at full circle size including the
-  // label block beneath, with room for the drift, so nodes never collide.
-  { id: 'a', x: 200, y: 150, author: 'Vaswani', title: 'Attention Is All You Need', year: 2017, citations: 112000, dx: 16, dy: -12, dur: 26 },
-  { id: 'b', x: 520, y: 110, author: 'Bahdanau', title: 'Neural Machine Translation', year: 2015, citations: 24000, dx: -13, dy: 15, dur: 31 },
-  { id: 'c', x: 210, y: 360, author: 'He', title: 'Deep Residual Learning', year: 2016, citations: 210000, dx: 12, dy: 14, dur: 29 },
-  { id: 'd', x: 560, y: 290, author: 'Devlin', title: 'BERT: Pre-training', year: 2019, citations: 88000, dx: -15, dy: -11, dur: 34 },
-  { id: 'e', x: 520, y: 450, author: 'Ranathunga', title: 'Low-Resource NMT Survey', year: 2021, citations: 1400, dx: 14, dy: -16, dur: 27 },
-  { id: 'f', x: 900, y: 180, author: 'Kaplan', title: 'Scaling Laws for LMs', year: 2020, citations: 6200, dx: -12, dy: 15, dur: 32 },
-  { id: 'g', x: 920, y: 380, author: 'Tay', title: 'Transformer Variants', year: 2022, citations: 900, dx: 15, dy: 12, dur: 28 },
+  // A seed paper with related work orbiting it - the product's actual core loop,
+  // and legible at a glance to someone who has never seen the app. Positions were
+  // solved for 65px of clearance at full size, including label blocks and drift,
+  // so nothing ever collides. Hand-scattered dots read as random; this doesn't.
+  { id: 's',  x: 540, y: 255, author: 'Vaswani', title: 'Attention Is All You Need', year: 2017, citations: 112000, ring: 'seed', label: true, dx: 6, dy: -5, dur: 30 },
+  { id: 'i0', x: 676, y: 130, author: 'Devlin', title: 'BERT: Pre-training', year: 2019, citations: 88000, ring: 'inner', label: true, dx: -9, dy: 8, dur: 27 },
+  { id: 'i1', x: 759, y: 303, author: 'Brown', title: 'Language Models are Few-Shot Learners', year: 2020, citations: 42000, ring: 'inner', label: true, dx: 8, dy: 9, dur: 31 },
+  { id: 'i2', x: 540, y: 410, author: 'Liu', title: 'RoBERTa', year: 2019, citations: 22000, ring: 'inner', label: false, dx: -7, dy: -9, dur: 26 },
+  { id: 'i3', x: 321, y: 303, author: 'Raffel', title: 'Exploring Transfer Learning', year: 2020, citations: 16000, ring: 'inner', label: false, dx: 9, dy: -7, dur: 33 },
+  { id: 'i4', x: 405, y: 129, author: 'Dai', title: 'Transformer-XL', year: 2019, citations: 4200, ring: 'inner', label: false, dx: -8, dy: 10, dur: 29 },
+  { id: 'o0', x: 830, y: 106, author: 'Sutskever', title: 'Sequence to Sequence Learning', year: 2014, citations: 28000, ring: 'outer', label: true, dx: 7, dy: 8, dur: 34 },
+  { id: 'o1', x: 983, y: 221, author: 'Bahdanau', title: 'Neural Machine Translation', year: 2015, citations: 24000, ring: 'outer', label: false, dx: -6, dy: -8, dur: 28 },
+  { id: 'o2', x: 929, y: 353, author: 'Radford', title: 'Improving Language Understanding', year: 2018, citations: 12000, ring: 'outer', label: false, dx: 8, dy: 6, dur: 32 },
+  { id: 'o3', x: 693, y: 438, author: 'Lewis', title: 'BART', year: 2020, citations: 9000, ring: 'outer', label: false, dx: -7, dy: 7, dur: 30 },
+  { id: 'o4', x: 385, y: 438, author: 'Kaplan', title: 'Scaling Laws for LMs', year: 2020, citations: 6200, ring: 'outer', label: false, dx: 9, dy: -6, dur: 27 },
+  { id: 'o5', x: 150, y: 352, author: 'Clark', title: 'ELECTRA', year: 2020, citations: 3400, ring: 'outer', label: false, dx: -8, dy: -7, dur: 35 },
+  { id: 'o6', x: 97,  y: 221, author: 'Beltagy', title: 'Longformer', year: 2020, citations: 3100, ring: 'outer', label: false, dx: 7, dy: 9, dur: 29 },
+  { id: 'o7', x: 251, y: 105, author: 'Ranathunga', title: 'Low-Resource NMT Survey', year: 2021, citations: 1400, ring: 'outer', label: false, dx: -9, dy: 6, dur: 33 },
+  { id: 'o8', x: 541, y: 60,  author: 'Tay', title: 'Efficient Transformers', year: 2022, citations: 900, ring: 'outer', label: false, dx: 6, dy: -8, dur: 26 },
 ];
 
 type PreviewEdge = { from: string; to: string; semantic?: boolean };
 
 const EDGES: PreviewEdge[] = [
-  { from: 'a', to: 'b' },
-  { from: 'a', to: 'c' },
-  { from: 'b', to: 'd' },
-  { from: 'c', to: 'd', semantic: true },
-  { from: 'c', to: 'e' },
-  { from: 'd', to: 'f' },
-  { from: 'd', to: 'g', semantic: true },
-  { from: 'e', to: 'g' },
+  // Everything in the inner ring links back to the seed; outer papers hang off
+  // whichever inner paper they relate to.
+  { from: 's', to: 'i0' },
+  { from: 's', to: 'i1' },
+  { from: 's', to: 'i2' },
+  { from: 's', to: 'i3' },
+  { from: 's', to: 'i4' },
+  { from: 'i0', to: 'o0' },
+  { from: 'i0', to: 'o8' },
+  { from: 'i1', to: 'o1' },
+  { from: 'i1', to: 'o2' },
+  { from: 'i1', to: 'o3', semantic: true },
+  { from: 'i2', to: 'o3' },
+  { from: 'i2', to: 'o4', semantic: true },
+  { from: 'i3', to: 'o4' },
+  { from: 'i3', to: 'o5' },
+  { from: 'i4', to: 'o6' },
+  { from: 'i4', to: 'o7', semantic: true },
+  { from: 'o0', to: 'o1' },
 ];
 
 type Point = { x: number; y: number };
@@ -268,6 +292,9 @@ function GraphPreview({ animated, interactive }: { animated: boolean; interactiv
                       : undefined
                   }
                 >
+                {n.ring === 'seed' ? (
+                  <circle cx={p.x} cy={p.y} r={r + 13} fill="none" stroke="#0066FF" strokeWidth={1.5} strokeDasharray="4 5" opacity={0.5} />
+                ) : null}
                 {isFocus ? <circle cx={p.x} cy={p.y} r={r + 9} fill="#0066FF" opacity={0.13} /> : null}
                 <circle
                   cx={p.x}
@@ -280,6 +307,7 @@ function GraphPreview({ animated, interactive }: { animated: boolean; interactiv
                 />
                 {/* Rest state is surname + year only, so the graph reads clean.
                     Title and citation count arrive on hover. */}
+                {n.label || isFocus ? (
                 <text
                   x={p.x}
                   y={p.y + r + 19}
@@ -291,6 +319,7 @@ function GraphPreview({ animated, interactive }: { animated: boolean; interactiv
                 >
                   {n.author} {n.year}
                 </text>
+                ) : null}
                 {isFocus ? (
                   <>
                     <text
@@ -345,10 +374,21 @@ function GraphPreview({ animated, interactive }: { animated: boolean; interactiv
   );
 }
 
-/** One line explaining both encodings, mirroring the Knowledge Graph legend. */
+/**
+ * Explains the picture to someone seeing it for the first time: what the layout
+ * means comes first, then the two encodings. Without the structural line the
+ * circles read as decoration.
+ */
 export function GraphLegend() {
   return (
-    <div className="mt-5 flex flex-wrap items-center justify-center gap-x-8 gap-y-3 text-[10px] font-sans font-bold uppercase tracking-widest text-black/60">
+    <div className="mt-5 flex flex-wrap items-center justify-center gap-x-7 gap-y-3 text-[10px] font-sans font-bold uppercase tracking-widest text-black/55">
+      <span className="flex items-center gap-2">
+        <span className="relative flex items-center justify-center" style={{ width: 18, height: 18 }} aria-hidden>
+          <span className="absolute inset-0 rounded-full border border-dashed border-accent opacity-60" />
+          <span className="rounded-full border-2 border-black bg-accent" style={{ width: 9, height: 9 }} />
+        </span>
+        <span>Seed paper, related work around it</span>
+      </span>
       <span className="flex items-end gap-1.5">
         <span className="rounded-full border-2 border-black bg-white" style={{ width: 8, height: 8 }} />
         <span className="rounded-full border-2 border-black bg-white" style={{ width: 13, height: 13 }} />
@@ -358,7 +398,7 @@ export function GraphLegend() {
       <span className="flex items-center gap-2">
         <span>{YEAR_RANGE.min}</span>
         <span
-          className="h-2.5 w-28 border-2 border-black"
+          className="h-2.5 w-24 border-2 border-black"
           style={{ background: `linear-gradient(90deg, ${yearColor(YEAR_RANGE.min, YEAR_RANGE)}, ${yearColor(YEAR_RANGE.max, YEAR_RANGE)})` }}
           aria-hidden
         />
