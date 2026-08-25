@@ -76,11 +76,12 @@
 
 .tm-caret {
   display: inline-block;
-  width: 0.06em;
-  height: 0.78em;
-  margin-left: 0.06em;
+  width: 0.035em;
+  height: 0.66em;
+  margin-left: 0.05em;
   vertical-align: baseline;
   background: currentColor;
+  opacity: 0.55;
   animation: tm-caret-blink 1.1s steps(1, end) infinite;
 }
 

@@ -147,9 +147,11 @@ function GraphPreview({ animated, interactive }: { animated: boolean; interactiv
     drag.current = null;
   }, []);
 
+  // Only ctrl/cmd + wheel zooms. A bare wheel over the hero graph used to zoom
+  // AND scroll the page at the same time, which felt broken.
   const handleWheel = useCallback(
     (e: React.WheelEvent) => {
-      if (!interactive) return;
+      if (!interactive || !(e.ctrlKey || e.metaKey)) return;
       setZoom((z) => clamp(z * (e.deltaY < 0 ? 1.12 : 0.89), 0.6, 2.4));
     },
     [interactive]
@@ -238,16 +240,8 @@ function GraphPreview({ animated, interactive }: { animated: boolean; interactiv
             return (
               <g
                 key={n.id}
-                className={[
-                  drifting ? 'tm-drift' : '',
-                  animated ? 'tm-enter' : '',
-                  interactive ? 'cursor-grab active:cursor-grabbing' : '',
-                ].join(' ').trim() || undefined}
+                className={interactive ? 'cursor-grab active:cursor-grabbing' : undefined}
                 style={{
-                  ...(drifting
-                    ? ({ '--tm-dx': `${n.dx}px`, '--tm-dy': `${n.dy}px`, '--tm-dur': `${n.dur}s` } as React.CSSProperties)
-                    : {}),
-                  ...(animated ? ({ '--tm-delay': `${0.35 + i * 0.07}s` } as React.CSSProperties) : {}),
                   opacity: active && !isActive ? 0.14 : 1,
                   transition: 'opacity 0.25s',
                   ...(interactive ? { touchAction: 'none' as const } : {}),
@@ -259,6 +253,21 @@ function GraphPreview({ animated, interactive }: { animated: boolean; interactiv
                 onMouseEnter={() => setHovered(n.id)}
                 onMouseLeave={() => setHovered(null)}
               >
+                {/* Entrance and drift live on separate elements on purpose: both
+                    set the `animation` shorthand, so sharing one element means
+                    one silently overrides the other. */}
+                <g
+                  className={animated ? 'tm-enter' : undefined}
+                  style={animated ? ({ '--tm-delay': `${0.3 + i * 0.06}s` } as React.CSSProperties) : undefined}
+                >
+                <g
+                  className={drifting ? 'tm-drift' : undefined}
+                  style={
+                    drifting
+                      ? ({ '--tm-dx': `${n.dx}px`, '--tm-dy': `${n.dy}px`, '--tm-dur': `${n.dur}s` } as React.CSSProperties)
+                      : undefined
+                  }
+                >
                 {isFocus ? <circle cx={p.x} cy={p.y} r={r + 9} fill="#0066FF" opacity={0.13} /> : null}
                 <circle
                   cx={p.x}
@@ -307,6 +316,8 @@ function GraphPreview({ animated, interactive }: { animated: boolean; interactiv
                     </text>
                   </>
                 ) : null}
+                </g>
+                </g>
               </g>
             );
           })}

@@ -16,7 +16,7 @@ import { useReducedMotion } from 'framer-motion';
  * prefers-reduced-motion. There was no reduced-motion guard here before.
  */
 
-const DOT_INTERVAL = 190;
+const DOT_INTERVAL = 165;
 
 /** Types an ellipsis in, one dot at a time, then holds. */
 export function TypingDots({ total = 3, className = '' }: { total?: number; className?: string }) {
@@ -57,7 +57,7 @@ type Phase = 'waiting' | 'typing' | 'deleting';
 export function WordCycler({
   words,
   className = '',
-  startDelay = 900,
+  startDelay = 620,
   typeSpeed = 55,
   deleteSpeed = 26,
   hold = 1900,
