@@ -1,14 +1,19 @@
 import './globals.css';
 import type { Metadata } from 'next';
-import { Instrument_Serif, DM_Sans } from 'next/font/google';
+import { Playfair_Display, DM_Sans } from 'next/font/google';
 import { AuthProvider } from '@/context/AuthContext';
 
-const instrumentSerif = Instrument_Serif({
-  weight: '400',
+// Instrument Serif ships weight 400 only, but the UI applies font-black to it in
+// 18 places including the wordmark, so the browser was synthesising those by
+// smearing the 400 glyphs. Playfair Display is the same species of high-contrast
+// display serif and has real 700/900, so every existing font-serif class now
+// renders a drawn weight instead of a faked one.
+const displaySerif = Playfair_Display({
+  weight: ['400', '700', '900'],
   subsets: ['latin'],
   display: 'swap',
   preload: true,
-  variable: '--font-instrument-serif',
+  variable: '--font-display',
 });
 
 const dmSans = DM_Sans({
@@ -49,7 +54,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={[instrumentSerif.variable, dmSans.variable].join(' ')}>
+    <html lang="en" className={[displaySerif.variable, dmSans.variable].join(' ')}>
       {/* JSON-LD lives on the landing page (app/page.tsx), not here — in the root
           layout it was injected into every route, including /admin. */}
       <body>

@@ -27,7 +27,7 @@ const config: Config = {
         'admin-bg-dark': '#000000',
       },
       fontFamily: {
-        serif: ['var(--font-instrument-serif)', 'Georgia', 'serif'],
+        serif: ['var(--font-display)', 'Georgia', 'serif'],
         sans: ['var(--font-dm-sans)', 'system-ui', 'sans-serif'],
       },
       borderRadius: {

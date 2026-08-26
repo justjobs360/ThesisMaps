@@ -4,7 +4,7 @@
 
 @layer base {
   :root {
-    --font-instrument-serif: 'Instrument Serif', Georgia, serif;
+    --font-display: 'Playfair Display', Georgia, serif;
     --font-dm-sans: 'DM Sans', system-ui, sans-serif;
   }
 

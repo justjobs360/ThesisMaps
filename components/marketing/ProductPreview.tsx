@@ -399,7 +399,12 @@ export function GraphLegend() {
         <span>{YEAR_RANGE.min}</span>
         <span
           className="h-2.5 w-24 border-2 border-black"
-          style={{ background: `linear-gradient(90deg, ${yearColor(YEAR_RANGE.min, YEAR_RANGE)}, ${yearColor(YEAR_RANGE.max, YEAR_RANGE)})` }}
+          style={{
+            background: `linear-gradient(90deg, ${yearColor(YEAR_RANGE.min, YEAR_RANGE)}, ${yearColor(
+              Math.round((YEAR_RANGE.min + YEAR_RANGE.max) / 2),
+              YEAR_RANGE
+            )}, ${yearColor(YEAR_RANGE.max, YEAR_RANGE)})`,
+          }}
           aria-hidden
         />
         <span>{YEAR_RANGE.max}</span>

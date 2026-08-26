@@ -9,28 +9,42 @@ const SLATE = '#94A3B8';
 const SLATE_DARK = '#475569';
 
 /**
- * Brand-consistent node colour for the graph canvas. Recolours by the active
- * heatmap mode so the "Color by …" control actually changes the visualisation
- * (previously a no-op). Palette is limited to the brand blue + neutral grays —
- * no gold/pastel.
- */
-/**
- * Continuous year ramp: old papers pale, recent papers deep blue, so foundational
- * vs current work is readable at a glance rather than in three coarse buckets.
- * `range` comes from the library's own min/max year, so the contrast adapts to
+ * Continuous year ramp: oldest work in warm ochre, through teal, to blue for the
+ * most recent.
+ *
+ * Two hues rather than one because a single-hue ramp cannot separate adjacent
+ * years — the previous pale-slate-to-blue scale put 2016 and 2019 within a few
+ * RGB steps of each other. It also started at #CBD5E1, which is 1.48:1 against
+ * white, so the oldest papers were very nearly invisible. Every stop on this
+ * ramp clears 3.7:1 and stays saturated, so no year washes out to grey.
+ *
+ * `range` comes from the library's own min/max year, so contrast adapts to
  * whatever span the user actually has.
  */
+type RGB = [number, number, number];
+const YEAR_STOPS: RGB[] = [
+  [0xa1, 0x62, 0x07], // oldest — ochre
+  [0x0d, 0x94, 0x88], // midpoint — teal, keeps the middle years saturated
+  [0x1d, 0x4e, 0xd8], // newest — blue
+];
+
 export function yearColor(year: number, range: { min: number; max: number }): string {
-  if (!year) return '#CBD5E1'; // unknown year — deliberately the palest, not "old"
+  if (!year) return '#94A3B8'; // unknown year — neutral, deliberately not "old"
   const span = Math.max(1, range.max - range.min);
   const t = Math.min(1, Math.max(0, (year - range.min) / span));
-  // Pale slate (#CBD5E1) -> brand blue (#0066FF)
-  const from = { r: 0xcb, g: 0xd5, b: 0xe1 };
-  const to = { r: 0x00, g: 0x66, b: 0xff };
-  const mix = (a: number, b: number) => Math.round(a + (b - a) * t);
-  return `rgb(${mix(from.r, to.r)}, ${mix(from.g, to.g)}, ${mix(from.b, to.b)})`;
+  const seg = 1 / (YEAR_STOPS.length - 1);
+  const i = Math.min(Math.floor(t / seg), YEAR_STOPS.length - 2);
+  const from = YEAR_STOPS[i]!;
+  const to = YEAR_STOPS[i + 1]!;
+  const local = (t - i * seg) / seg;
+  const mix = (a: number, b: number) => Math.round(a + (b - a) * local);
+  return `rgb(${mix(from[0], to[0])}, ${mix(from[1], to[1])}, ${mix(from[2], to[2])})`;
 }
 
+/**
+ * Node colour for the graph canvas, by the active heatmap mode. The 'year' mode
+ * uses the two-hue ramp above; the others stay on the brand blue and neutrals.
+ */
 export function nodeColor(
   node: GraphNode,
   mode: HeatmapMode,
