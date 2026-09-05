@@ -37,7 +37,11 @@ export function Button({
     <button
       disabled={disabled ?? loading}
       className={[
-        'inline-flex items-center justify-center gap-2 font-sans font-medium transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed',
+        // Every property that any variant animates is listed, on the one shared
+        // curve and the 400ms tier. `transition-colors duration-150` before this
+        // meant a button's colour swapped on a different curve and in a third of
+        // the time of everything else it sat next to.
+        'inline-flex items-center justify-center gap-2 font-sans font-medium transition-[color,background-color,border-color,box-shadow,transform] duration-base ease-tm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed',
         variantClasses[variant],
         sizeClasses[size],
         pill ? 'rounded-full' : 'rounded',

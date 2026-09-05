@@ -191,7 +191,7 @@ export default function SeedsPage() {
                       <div className="flex-1 min-w-0">
                         <p className="text-[11px] font-sans font-black text-black uppercase tracking-tight truncate">{paper.title}</p>
                         <p className="text-[10px] text-black/60 font-sans font-bold uppercase tracking-tighter mt-1">
-                          {paper.year || '—'} // {paper.authors[0]?.name.toUpperCase() ?? 'UNKNOWN'}
+                          {paper.year || '—'} {'//'} {paper.authors[0]?.name.toUpperCase() ?? 'UNKNOWN'}
                         </p>
                       </div>
                       <Badge variant="primary" className="rounded-none border-2 border-black px-3 py-1 font-black text-[9px] uppercase tracking-widest">Seed</Badge>

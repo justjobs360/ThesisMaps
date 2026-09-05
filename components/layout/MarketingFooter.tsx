@@ -18,8 +18,8 @@ export function MarketingFooter() {
           ThesisMaps<span className="text-accent">.</span>
         </span>
         <nav className="flex gap-8 sm:justify-self-center" aria-label="Footer navigation">
-          <Link href="/login" className="text-xs font-sans font-bold uppercase tracking-widest text-text-muted hover:text-black transition-colors">Sign in</Link>
-          <Link href="/signup" className="text-xs font-sans font-bold uppercase tracking-widest text-text-muted hover:text-black transition-colors">Sign up</Link>
+          <Link href="/login" className="text-xs font-sans font-bold uppercase tracking-widest text-text-muted hover:text-black transition-colors duration-fast ease-tm">Sign in</Link>
+          <Link href="/signup" className="text-xs font-sans font-bold uppercase tracking-widest text-text-muted hover:text-black transition-colors duration-fast ease-tm">Sign up</Link>
         </nav>
         <p className="text-xs font-sans font-bold uppercase tracking-widest text-text-muted text-center sm:text-right sm:justify-self-end">
           © {new Date().getFullYear()} ThesisMaps. Intelligence for researchers.

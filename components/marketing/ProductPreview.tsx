@@ -13,11 +13,34 @@ import { yearColor } from '@/components/graph/nodeColor';
  * like a screenshot dropped into it.
  *
  * Plain SVG rather than ReactFlow or d3: the marketing route stays light. Motion
- * is CSS-only (the .tm-* rules in globals.css, all reduced-motion gated there).
+ * is CSS-only (the .tm-* rules in globals.css, all reduced-motion gated there),
+ * and every duration and curve here comes from the same tokens the rest of the
+ * page uses — --tm-ease, and the 200/400/600ms tiers — so the graph moves like
+ * the site around it rather than like an embedded widget.
  */
 
-const EDGE_CITATION = '#94A3B8';
+/**
+ * Edges are drawn in the brand's own two line colours and nothing else. The
+ * citation colour was #94A3B8 slate, which is a fourth neutral the product does
+ * not use anywhere in its type or borders; against a page whose every rule and
+ * frame is pure black, slate lines read as a different drawing. Black at low
+ * opacity gives the same visual weight while staying inside the palette.
+ */
+const EDGE_CITATION = '#000000';
 const EDGE_SEMANTIC = '#0066FF';
+
+/**
+ * Motion constants, shared with the CSS tokens.
+ *
+ * The entrance is offset so it begins after the hero's headline and buttons have
+ * landed (see the Entrance delays in app/page.tsx). The graph is the largest
+ * element on the page; starting it at t=0 meant it competed with the headline for
+ * attention and the arrival read as everything happening at once instead of as a
+ * sequence.
+ */
+const EASE = 'cubic-bezier(0, 0, 0.3642, 1)';
+const EDGE_START = 0.55;
+const NODE_START = 0.75;
 
 const VIEW_W = 1080;
 const VIEW_H = 550;
@@ -102,15 +125,24 @@ const shortCount = (n: number) => (n >= 1000 ? `${Math.round(n / 1000)}k` : `${n
 const YEARS = NODES.map((n) => n.year);
 const YEAR_RANGE = { min: Math.min(...YEARS), max: Math.max(...YEARS) };
 
-/** Soft bezier between two node centres, matching the app's edge shape. */
-function curve(a: Point, b: Point): string {
-  const dx = Math.max(50, Math.abs(b.x - a.x) / 2);
-  return `M ${a.x} ${a.y} C ${a.x + dx} ${a.y}, ${b.x - dx} ${b.y}, ${b.x} ${b.y}`;
+/**
+ * Straight line between two node centres.
+ *
+ * This was a cubic bezier with horizontal control handles. Two reasons it is now
+ * a line. First, the real graph draws straight edges (components/graph/
+ * EdgeTypes.tsx), so the curves made the marketing preview a picture of a
+ * product that does not exist. Second, curves were the one soft form on a page
+ * built entirely from hard 2px rules and square corners — they read as the
+ * decoration they were, and they lied about the data by implying a direction of
+ * travel through space that no link has.
+ */
+function linePath(a: Point, b: Point): string {
+  return `M ${a.x} ${a.y} L ${b.x} ${b.y}`;
 }
 
-/** Approximate path length, used to seed the draw-in dash pattern. */
-function roughLen(a: Point, b: Point): number {
-  return Math.hypot(b.x - a.x, b.y - a.y) * 1.3;
+/** Exact path length, used to seed the draw-in dash pattern. */
+function pathLen(a: Point, b: Point): number {
+  return Math.hypot(b.x - a.x, b.y - a.y);
 }
 
 /** Direct neighbours of a node, for hover isolation. */
@@ -182,7 +214,7 @@ function GraphPreview({ animated, interactive }: { animated: boolean; interactiv
   );
 
   const zoomBtn =
-    'w-7 h-7 flex items-center justify-center border-2 border-black bg-white text-black text-sm font-black leading-none hover:bg-black hover:text-white transition-colors';
+    'w-7 h-7 flex items-center justify-center border-2 border-black bg-white text-black text-sm font-black leading-none hover:bg-black hover:text-white transition-colors duration-base ease-tm';
 
   return (
     <div className="relative w-full h-full">
@@ -213,14 +245,14 @@ function GraphPreview({ animated, interactive }: { animated: boolean; interactiv
                 x2={b.x}
                 y2={b.y}
               >
-                <stop offset="0%" stopColor={stroke} stopOpacity={0.12} />
+                <stop offset="0%" stopColor={stroke} stopOpacity={0.25} />
                 <stop offset="100%" stopColor={stroke} stopOpacity={1} />
               </linearGradient>
             );
           })}
         </defs>
 
-        <g style={{ transform: `scale(${zoom})`, transformOrigin: 'center', transition: 'transform 0.18s ease-out' }}>
+        <g style={{ transform: `scale(${zoom})`, transformOrigin: 'center', transition: `transform 400ms ${EASE}` }}>
           {/* Edges first so the circles paint over their endpoints. */}
           <g>
             {EDGES.map((e, i) => {
@@ -229,23 +261,29 @@ function GraphPreview({ animated, interactive }: { animated: boolean; interactiv
               if (!a || !b) return null;
               const touches = active ? active.has(e.from) && active.has(e.to) : false;
               const dim = active ? !touches : false;
-              const len = Math.round(roughLen(a, b));
+              const len = Math.round(pathLen(a, b));
               return (
                 <path
                   key={`${e.from}-${e.to}`}
-                  d={curve(a, b)}
+                  d={linePath(a, b)}
                   fill="none"
                   stroke={`url(#tm-edge-${e.from}-${e.to})`}
                   strokeWidth={touches ? 2.5 : 1.25}
                   strokeLinecap="round"
-                  opacity={dim ? 0.06 : touches ? 1 : 0.34}
+                  // Tuned against the rendered page rather than in the
+                  // abstract: black at the slate's old 0.34 looked heavier in
+                  // theory but lighter in practice, because the gradient's low
+                  // end disappears completely against white where slate still
+                  // held a tint. 0.42 restores the mesh to the weight the layout
+                  // was drawn around.
+                  opacity={dim ? 0.06 : touches ? 1 : 0.42}
                   className={[animated && !active ? 'tm-draw' : '', touches ? 'tm-flow' : ''].join(' ').trim() || undefined}
                   style={
                     {
-                      transition: 'opacity 0.25s, stroke-width 0.25s',
+                      transition: `opacity 400ms ${EASE}, stroke-width 400ms ${EASE}`,
                       ...(touches ? { strokeDasharray: '14 10', '--tm-flow-len': 24, '--tm-dur': '0.9s' } : {}),
                       ...(animated && !active
-                        ? { strokeDasharray: len, '--tm-draw-len': len, '--tm-delay': `${0.05 * i}s` }
+                        ? { strokeDasharray: len, '--tm-draw-len': len, '--tm-delay': `${EDGE_START + 0.045 * i}s` }
                         : {}),
                     } as React.CSSProperties
                   }
@@ -266,8 +304,8 @@ function GraphPreview({ animated, interactive }: { animated: boolean; interactiv
                 key={n.id}
                 className={interactive ? 'cursor-grab active:cursor-grabbing' : undefined}
                 style={{
-                  opacity: active && !isActive ? 0.14 : 1,
-                  transition: 'opacity 0.25s',
+                  opacity: active && !isActive ? 0.12 : 1,
+                  transition: `opacity 400ms ${EASE}`,
                   ...(interactive ? { touchAction: 'none' as const } : {}),
                 }}
                 onPointerDown={interactive ? (e) => handlePointerDown(e, n.id) : undefined}
@@ -282,7 +320,7 @@ function GraphPreview({ animated, interactive }: { animated: boolean; interactiv
                     one silently overrides the other. */}
                 <g
                   className={animated ? 'tm-enter' : undefined}
-                  style={animated ? ({ '--tm-delay': `${0.3 + i * 0.06}s` } as React.CSSProperties) : undefined}
+                  style={animated ? ({ '--tm-delay': `${NODE_START + i * 0.055}s` } as React.CSSProperties) : undefined}
                 >
                 <g
                   className={drifting ? 'tm-drift' : undefined}
@@ -303,7 +341,7 @@ function GraphPreview({ animated, interactive }: { animated: boolean; interactiv
                   fill={fill}
                   stroke="#000000"
                   strokeWidth={isFocus ? 3.5 : 2}
-                  style={{ transition: 'stroke-width 0.15s' }}
+                  style={{ transition: `stroke-width 200ms ${EASE}` }}
                 />
                 {/* Rest state is surname + year only, so the graph reads clean.
                     Title and citation count arrive on hover. */}
@@ -449,12 +487,31 @@ function SourcesPreview() {
   );
 }
 
+/**
+ * Coverage tones, drawn only from tokens the brutalist system already uses.
+ *
+ * These were `bg-success` (#2D6A4F dark green) and `bg-warning` (#B45309 amber).
+ * Both are legitimate status colours in the APP, where they appear as text on
+ * dense data screens — but as large fills on the marketing page they were two
+ * more hues in a layout that is otherwise strictly black, white and #0066FF, and
+ * they read as belonging to a different product for the same reason the graph's
+ * ochre-and-teal year ramp did.
+ *
+ * Red survives the cull because `danger` (#FF0000) is already a brand token and
+ * flat red on white is squarely inside this idiom; green and amber are not.
+ * Severity still reads without hue memory, because the three tones differ in
+ * weight as well as colour: red alarms, black is neutral, blue is healthy.
+ */
+const TONE_HEALTHY = 'bg-accent';
+const TONE_NEUTRAL = 'bg-black';
+const TONE_CRITICAL = 'bg-danger';
+
 function OutlinePreview() {
   const rows = [
-    { title: '1. Introduction', count: 8, pct: 82, tone: 'bg-success' },
-    { title: '2. Literature Review', count: 14, pct: 61, tone: 'bg-success' },
-    { title: '3. Methodology', count: 4, pct: 34, tone: 'bg-warning' },
-    { title: '4. Analysis', count: 1, pct: 12, tone: 'bg-danger' },
+    { title: '1. Introduction', count: 8, pct: 82, tone: TONE_HEALTHY },
+    { title: '2. Literature Review', count: 14, pct: 61, tone: TONE_HEALTHY },
+    { title: '3. Methodology', count: 4, pct: 34, tone: TONE_NEUTRAL },
+    { title: '4. Analysis', count: 1, pct: 12, tone: TONE_CRITICAL },
   ];
   return (
     <PanelStack>
@@ -495,10 +552,14 @@ function GapsPreview() {
 }
 
 function DefencePreview() {
+  // Three distinct tags need three distinguishable tones. Both of the amber ones
+  // collapsed onto the same colour once amber was dropped, so they split across
+  // the remaining two: black for the factual conflict, accent for the weakest of
+  // the three. Ordered red > black > blue, which is also their severity order.
   const items = [
-    { label: 'Sample size may not generalise', tag: 'Challenge', tone: 'bg-danger' },
-    { label: 'Conflicting result in Zhou 2021', tag: 'Contradicts', tone: 'bg-warning' },
-    { label: 'Baseline choice needs defending', tag: 'Critique', tone: 'bg-warning' },
+    { label: 'Sample size may not generalise', tag: 'Challenge', tone: TONE_CRITICAL },
+    { label: 'Conflicting result in Zhou 2021', tag: 'Contradicts', tone: TONE_NEUTRAL },
+    { label: 'Baseline choice needs defending', tag: 'Critique', tone: TONE_HEALTHY },
   ];
   return (
     <PanelStack>

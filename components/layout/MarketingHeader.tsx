@@ -11,9 +11,9 @@ export function MarketingHeader() {
           ThesisMaps<span className="text-accent">.</span>
         </Link>
         <div className="hidden md:flex items-center gap-8">
-          <Link href="/#features" className="text-xs font-sans font-bold uppercase tracking-widest text-text-muted hover:text-black transition-colors">Features</Link>
-          <Link href="/#how-it-works" className="text-xs font-sans font-bold uppercase tracking-widest text-text-muted hover:text-black transition-colors">Process</Link>
-          <Link href="/login" className="text-xs font-sans font-bold uppercase tracking-widest text-text-muted hover:text-black transition-colors">Sign in</Link>
+          <Link href="/#features" className="text-xs font-sans font-bold uppercase tracking-widest text-text-muted hover:text-black transition-colors duration-fast ease-tm">Features</Link>
+          <Link href="/#how-it-works" className="text-xs font-sans font-bold uppercase tracking-widest text-text-muted hover:text-black transition-colors duration-fast ease-tm">Process</Link>
+          <Link href="/login" className="text-xs font-sans font-bold uppercase tracking-widest text-text-muted hover:text-black transition-colors duration-fast ease-tm">Sign in</Link>
           <Link href="/signup">
             <Button size="sm" variant="primary">Get Started</Button>
           </Link>

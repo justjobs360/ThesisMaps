@@ -9,23 +9,35 @@ const SLATE = '#94A3B8';
 const SLATE_DARK = '#475569';
 
 /**
- * Continuous year ramp: oldest work in warm ochre, through teal, to blue for the
- * most recent.
+ * Continuous year ramp: oldest work pale, deepening through the brand accent to
+ * near-black for the most recent.
  *
- * Two hues rather than one because a single-hue ramp cannot separate adjacent
- * years — the previous pale-slate-to-blue scale put 2016 and 2019 within a few
- * RGB steps of each other. It also started at #CBD5E1, which is 1.48:1 against
- * white, so the oldest papers were very nearly invisible. Every stop on this
- * ramp clears 3.7:1 and stays saturated, so no year washes out to grey.
+ * This replaced an ochre -> teal -> blue ramp. That version separated adjacent
+ * years well, but it introduced two hues the product does not otherwise use, so
+ * the graph was the only surface in the app painting in orange and green while
+ * everything around it was black, white and #0066FF. On the landing page the
+ * effect was worse — the hero graph is the largest single element and it read as
+ * a foreign widget rather than a picture of this product.
  *
- * `range` comes from the library's own min/max year, so contrast adapts to
- * whatever span the user actually has.
+ * A monochrome ramp is also the more honest encoding. Year is an ORDERED
+ * quantity, and ordered data wants a scale that varies monotonically in
+ * lightness so "further along the ramp" is directly visible. Hue steps do not
+ * carry order: nothing about ochre says it precedes teal. Here every step gets
+ * darker, so age reads without consulting the legend.
+ *
+ * Contrast: the mid and newest stops clear 4.5:1 on white. The pale stop is
+ * deliberately low-contrast as a FILL — legibility of a node comes from its 2px
+ * black stroke, not its fill — and its job is to sit at the bottom of the
+ * lightness ramp so recent work visibly dominates.
+ *
+ * `range` comes from the library's own min/max year, so the ramp always spans
+ * whatever period the user actually has.
  */
 type RGB = [number, number, number];
 const YEAR_STOPS: RGB[] = [
-  [0xa1, 0x62, 0x07], // oldest — ochre
-  [0x0d, 0x94, 0x88], // midpoint — teal, keeps the middle years saturated
-  [0x1d, 0x4e, 0xd8], // newest — blue
+  [0xbf, 0xd3, 0xf2], // oldest — pale blue, recedes
+  [0x00, 0x66, 0xff], // midpoint — the brand accent, exactly
+  [0x0a, 0x1f, 0x3d], // newest — near-black navy, advances
 ];
 
 export function yearColor(year: number, range: { min: number; max: number }): string {

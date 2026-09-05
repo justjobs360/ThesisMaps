@@ -6,6 +6,19 @@
   :root {
     --font-display: 'Playfair Display', Georgia, serif;
     --font-dm-sans: 'DM Sans', system-ui, sans-serif;
+
+    /**
+     * The one easing curve. Mirrored as `ease-tm` in tailwind.config.ts for
+     * utility classes; this var is for the hand-written keyframes below and for
+     * inline styles in SVG, where a Tailwind class cannot reach.
+     *
+     * It leaves 0 instantly and decelerates for the rest of its run, which is
+     * why motion built on it reads as something with mass being released rather
+     * than a value being interpolated. Using a SINGLE curve everywhere matters
+     * more than which curve it is: mixed easings are what make a page feel
+     * like separate pieces glued together.
+     */
+    --tm-ease: cubic-bezier(0, 0, 0.3642, 1);
   }
 
   *, *::before, *::after {
@@ -17,6 +30,21 @@
     -moz-osx-font-smoothing: grayscale;
     overflow-x: hidden;
     scrollbar-gutter: stable;
+    /**
+     * For framer-motion's `useScroll` (components/marketing/Reveal.tsx).
+     *
+     * With no `container` option it measures against document.documentElement,
+     * and it walks `offsetParent` from the target up to that container to
+     * accumulate the target's offset. A static <html> is never in an
+     * offsetParent chain, so the walk terminates at <body> instead of at the
+     * container it is measuring against — which happens to give the right answer
+     * for a plain document and silently gives the wrong one as soon as anything
+     * in between is positioned. framer-motion warns about exactly this.
+     *
+     * Safe for the fixed header: `position: fixed` resolves against the
+     * viewport, not against the nearest positioned ancestor.
+     */
+    position: relative;
   }
 
   body {
@@ -49,6 +77,31 @@
    */
   html body[data-scroll-locked] {
     margin-right: 0 !important;
+  }
+
+  /**
+   * Lenis (components/marketing/SmoothScroll.tsx) drives scrollTop from its own
+   * rAF loop, so the document must not be height-constrained and the browser's
+   * native smooth-scroll must be out of the way or the two fight each other and
+   * the page stutters. These classes are added to <html> by Lenis itself, so on
+   * routes without it — the whole app shell — nothing here applies.
+   */
+  html.lenis,
+  html.lenis body {
+    height: auto;
+  }
+
+  html.lenis-smooth {
+    scroll-behavior: auto !important;
+  }
+
+  /* Opt-out hook: any scrollable pane inside the page keeps native scrolling. */
+  html.lenis-smooth [data-lenis-prevent] {
+    overscroll-behavior: contain;
+  }
+
+  html.lenis-stopped {
+    overflow: hidden;
   }
 }
 
@@ -106,20 +159,27 @@
 }
 
 .tm-draw {
-  animation: tm-draw 1s ease-out var(--tm-delay, 0s) both;
+  animation: tm-draw 1.1s var(--tm-ease) var(--tm-delay, 0s) both;
 }
 
-/** One-shot entrance: nodes settle in with a brief accent halo. */
+/**
+ * One-shot entrance: nodes settle in.
+ *
+ * The overshoot to 1.06 was removed. A bounce is a different motion vocabulary
+ * from the rest of the page — everything else decelerates monotonically into
+ * place on --tm-ease — and a node that springs past its own radius also breaks
+ * the illusion that its size means something. It now scales up from 0.72 and
+ * eases to rest, which reads as arriving from depth rather than popping.
+ */
 @keyframes tm-enter {
-  from { transform: scale(0.5); opacity: 0; }
-  60%  { transform: scale(1.06); opacity: 1; }
+  from { transform: scale(0.72); opacity: 0; }
   to   { transform: scale(1); opacity: 1; }
 }
 
 .tm-enter {
   transform-box: fill-box;
   transform-origin: center;
-  animation: tm-enter 0.55s cubic-bezier(0.22, 1, 0.36, 1) var(--tm-delay, 0s) both;
+  animation: tm-enter 0.7s var(--tm-ease) var(--tm-delay, 0s) both;
 }
 
 .tm-drift {
@@ -138,8 +198,31 @@
   .tm-drift,
   .tm-pulse,
   .tm-flow,
-  .tm-caret {
+  .animate-tm-float {
     animation: none !important;
+  }
+
+  /* Removed rather than merely stilled: a caret that never blinks is not a
+     caret, it is a stray vertical rule sitting in the middle of the headline. */
+  .tm-caret {
+    display: none !important;
+  }
+
+  /**
+   * The reveal, entrance and parallax primitives
+   * (components/marketing/Reveal.tsx), pinned to their settled state.
+   *
+   * This lives in CSS rather than in the components because those must render
+   * the same tree on the server and at hydration, and `prefers-reduced-motion`
+   * cannot be known on the server. `!important` is load-bearing: framer-motion
+   * writes opacity and transform as INLINE styles and keeps writing them every
+   * frame, and an important author rule is the one thing that outranks a normal
+   * inline declaration.
+   */
+  [data-tm-motion] {
+    opacity: 1 !important;
+    transform: none !important;
+    transition: none !important;
   }
 
   .tm-draw,

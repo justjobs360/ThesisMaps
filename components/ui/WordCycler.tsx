@@ -105,7 +105,12 @@ export function WordCycler({
       <span className="sr-only">{words.join(', ')}</span>
       <span aria-hidden>
         {text}
-        {reduce ? null : <span className="tm-caret" />}
+        {/* Always rendered, hidden in CSS under reduced motion (see the
+            .tm-caret rule in globals.css). Rendering it conditionally on
+            `reduce` used to throw a hydration mismatch: the server cannot know
+            the media query, so it always emitted the caret, and a client that
+            prefers reduced motion then hydrated a tree without it. */}
+        <span className="tm-caret" />
       </span>
     </span>
   );
