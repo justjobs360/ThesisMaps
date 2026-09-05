@@ -163,7 +163,7 @@ export default function LandingPage() {
             />
           </div>
 
-          <div className="relative pt-28 md:pt-40 pb-16 md:pb-24 px-6 max-w-6xl mx-auto text-left">
+          <div className="relative pt-24 md:pt-32 pb-10 md:pb-14 px-6 max-w-6xl mx-auto text-left">
 
           {/* Hero arrival, top down. Each element sits one STAGGER step behind
               the one above it, so the block assembles as a single downward
@@ -212,7 +212,7 @@ export default function LandingPage() {
               viewport slightly slower than the text above it, which is what puts
               it on its own plane. 28px over a full transit — the reader should
               feel the depth, not watch it. */}
-          <Entrance delay={STAGGER * 5} className="mt-10 md:mt-12">
+          <Entrance delay={STAGGER * 5} className="mt-8 md:mt-10">
             <Parallax from={28} to={-28} className="relative w-full aspect-[1080/550]">
               <ProductPreview kind="graph" animated interactive />
             </Parallax>
@@ -222,8 +222,8 @@ export default function LandingPage() {
         </section>
 
         {/* Thesis Stages */}
-        <section id="how-it-works" className="py-16 bg-white" aria-labelledby="stages-heading">
-          <div className="max-w-6xl mx-auto px-6 border-y-2 border-black py-12">
+        <section id="how-it-works" className="py-10 bg-white" aria-labelledby="stages-heading">
+          <div className="max-w-6xl mx-auto px-6 border-y-2 border-black py-9">
             <Reveal y={20}>
               <p id="stages-heading" className="text-xs font-sans font-bold uppercase tracking-[0.2em] text-black text-center mb-8">Works across every thesis stage</p>
             </Reveal>
@@ -255,9 +255,9 @@ export default function LandingPage() {
         </section>
 
         {/* Features */}
-        <section id="features" className="py-24 md:py-32 max-w-6xl mx-auto px-6" aria-labelledby="features-heading">
+        <section id="features" className="py-16 md:py-20 max-w-6xl mx-auto px-6" aria-labelledby="features-heading">
           <h2 id="features-heading" className="sr-only">Features</h2>
-          <div className="space-y-32 md:space-y-40">
+          <div className="space-y-16 md:space-y-20">
             {FEATURES.map((feature, i) => {
               const Icon = feature.icon;
               const reversed = i % 2 === 1;
@@ -274,12 +274,12 @@ export default function LandingPage() {
                     {/* Label, heading and body on consecutive stagger steps: the
                         eye is led down the column in reading order instead of
                         being handed the whole block at once. */}
-                    <Reveal y={20} className="flex items-center justify-center md:justify-start gap-3 mb-6">
+                    <Reveal y={20} className="flex items-center justify-center md:justify-start gap-3 mb-5">
                       <Icon size={20} strokeWidth={2} className="text-accent" aria-hidden />
                       <span className="text-[10px] md:text-sm font-sans font-bold uppercase tracking-[0.2em] text-accent">{feature.label}</span>
                     </Reveal>
                     <Reveal delay={STAGGER} y={28}>
-                      <h3 className="font-serif text-2xl md:text-display-sm text-text-primary leading-tight mb-6">{feature.heading}</h3>
+                      <h3 className="font-serif text-2xl md:text-display-sm text-text-primary leading-tight mb-5">{feature.heading}</h3>
                     </Reveal>
                     <Reveal as="p" delay={STAGGER * 2} y={24} className="font-sans text-text-muted text-base md:text-lg leading-relaxed">
                       {feature.body}
@@ -295,8 +295,16 @@ export default function LandingPage() {
                   {/* The visual column travels on its own plane. Its parallax
                       offset simply differs from the text column beside it, which
                       is enough to separate the row into foreground and background
-                      as it passes through the viewport. */}
-                  <Reveal delay={STAGGER} y={44} className="w-full md:flex-1 h-56 md:h-80">
+                      as it passes through the viewport.
+
+                      One height at every breakpoint, not a `md:` step up. The
+                      tallest panel needs ~233px on desktop and ~222px on mobile
+                      (narrower column, so the labels wrap onto more lines) — the
+                      two demands are close enough that a single 240px box clears
+                      both with margin. It was `h-56 md:h-80`, where the desktop
+                      320px left 90px of dead air under every panel and the mobile
+                      224px was 2px off clipping the defence cards. */}
+                  <Reveal delay={STAGGER} y={44} className="w-full md:flex-1 h-60">
                     <Parallax from={34} to={-34} className="relative w-full h-full">
                       <ProductPreview kind={feature.preview} interactive />
                     </Parallax>
@@ -308,10 +316,10 @@ export default function LandingPage() {
         </section>
 
         {/* Differentiators */}
-        <section className="py-24 bg-white" aria-labelledby="differentiators-heading">
+        <section className="py-16 bg-white" aria-labelledby="differentiators-heading">
           <div className="max-w-6xl mx-auto px-6">
             <Reveal>
-              <h2 id="differentiators-heading" className="font-serif text-display-sm text-text-primary text-center mb-16">
+              <h2 id="differentiators-heading" className="font-serif text-display-sm text-text-primary text-center mb-10">
                 Built differently, for researchers
               </h2>
             </Reveal>
@@ -344,7 +352,7 @@ export default function LandingPage() {
         </section>
 
         {/* CTA */}
-        <section className="py-32 text-center px-6 bg-black text-white relative overflow-hidden" aria-labelledby="cta-heading">
+        <section className="py-20 text-center px-6 bg-black text-white relative overflow-hidden" aria-labelledby="cta-heading">
           {/* The dot grid drifts against the scroll direction, so the black panel
               has a floor that moves independently of the words standing on it.
               `-inset-y-24` gives the layer enough overhang that its own travel
@@ -354,11 +362,11 @@ export default function LandingPage() {
           </Parallax>
           <div className="relative z-10">
             <Reveal>
-              <h2 id="cta-heading" className="font-serif text-display mb-8 max-w-4xl mx-auto">
+              <h2 id="cta-heading" className="font-serif text-display mb-6 max-w-4xl mx-auto">
                 Start mapping your research today
               </h2>
             </Reveal>
-            <Reveal as="p" delay={STAGGER} className="font-sans text-white/60 text-xl mb-12 max-w-xl mx-auto font-medium">
+            <Reveal as="p" delay={STAGGER} className="font-sans text-white/60 text-xl mb-9 max-w-xl mx-auto font-medium">
               Free to start. No credit card required. Built for the way researchers actually work.
             </Reveal>
             <Reveal delay={STAGGER * 2}>
