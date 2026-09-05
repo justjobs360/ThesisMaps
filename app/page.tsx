@@ -102,9 +102,23 @@ export default function LandingPage() {
 
       <main>
         {/* Hero */}
-        <section className="pt-28 md:pt-40 pb-16 md:pb-24 px-6 max-w-6xl mx-auto text-left relative" aria-labelledby="hero-heading">
-          <div className="absolute top-0 left-0 w-full h-full -z-10 opacity-40 mix-blend-multiply pointer-events-none bg-[radial-gradient(circle_at_top_right,_var(--tw-gradient-stops))] from-accent/5 via-transparent to-transparent"></div>
-
+        {/**
+          * Two boxes, deliberately: a full-bleed shell that owns the decoration
+          * and positioning, and a clamped column inside it that owns the content.
+          *
+          * They used to be one element carrying `max-w-6xl mx-auto` AND
+          * `relative` together, which meant every `absolute inset-0` decorative
+          * layer resolved against the 1152px CONTENT box rather than the
+          * viewport. On any screen wider than that, the background wash stopped
+          * dead in a hard vertical seam at the column edge with pure white beyond
+          * it, and the ambient circle was sliced off by the column's
+          * overflow-hidden mid-page. Both looked like rendering faults rather
+          * than decisions.
+          *
+          * Decoration must span the viewport; only text needs a measure. Now the
+          * marks bleed off the true page edge, which reads as intentional.
+          */}
+        <section className="relative overflow-hidden" aria-labelledby="hero-heading">
           {/**
             * Ambient layer: two large, near-invisible marks drifting on long
             * out-of-phase loops, so the hero is never completely still even
@@ -117,17 +131,39 @@ export default function LandingPage() {
             * decorative, so both are aria-hidden and inert, and both stop dead
             * under prefers-reduced-motion via the .animate-tm-float gate in
             * globals.css.
+            *
+            * No negative z-index anywhere: this layer is simply painted first and
+            * the content column below is `relative`, so it stacks on top by
+            * document order. `-z-10` worked only for as long as nothing in the
+            * ancestry created a stacking context.
             */}
-          <div className="absolute inset-0 -z-10 overflow-hidden pointer-events-none" aria-hidden>
+          <div className="absolute inset-0 pointer-events-none" aria-hidden>
+            <div className="absolute inset-0 opacity-40 mix-blend-multiply bg-[radial-gradient(circle_at_top_right,_var(--tw-gradient-stops))] from-accent/5 via-transparent to-transparent" />
+            {/**
+              * Both marks are `xl:` only.
+              *
+              * Ambient decoration needs somewhere to live that is not on top of
+              * the words. That space is the gutter outside the max-w-6xl column,
+              * and it does not exist until the viewport exceeds roughly 1200px —
+              * below that the column is the full width of the screen. On a phone
+              * a 560px circle is wider than the viewport, so its arc swept
+              * straight through the body copy, which is the opposite of ambient.
+              *
+              * Sized and offset so the arc crosses only the empty right-hand side
+              * of the hero, never the headline, and exits through the viewport
+              * edge rather than stopping in open space.
+              */}
             <div
-              className="absolute -top-24 -right-16 w-[520px] h-[520px] rounded-full border-2 border-accent/[0.07] animate-tm-float"
+              className="hidden xl:block absolute -top-40 -right-48 w-[560px] h-[560px] rounded-full border-2 border-accent/[0.07] animate-tm-float"
               style={{ '--tm-dur': '17s', '--tm-float': '30px' } as CSSProperties}
             />
             <div
-              className="absolute top-[46%] -left-28 w-[360px] h-[360px] animate-tm-float bg-[radial-gradient(#000000_1px,transparent_1px)] [background-size:26px_26px] opacity-[0.05]"
+              className="hidden xl:block absolute top-[46%] -left-28 w-[360px] h-[360px] animate-tm-float bg-[radial-gradient(#000000_1px,transparent_1px)] [background-size:26px_26px] opacity-[0.05]"
               style={{ '--tm-dur': '23s', '--tm-float': '22px' } as CSSProperties}
             />
           </div>
+
+          <div className="relative pt-28 md:pt-40 pb-16 md:pb-24 px-6 max-w-6xl mx-auto text-left">
 
           {/* Hero arrival, top down. Each element sits one STAGGER step behind
               the one above it, so the block assembles as a single downward
@@ -182,6 +218,7 @@ export default function LandingPage() {
             </Parallax>
             <GraphLegend />
           </Entrance>
+          </div>
         </section>
 
         {/* Thesis Stages */}
