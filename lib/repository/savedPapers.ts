@@ -112,12 +112,15 @@ export async function updateSavedPaper(
 }
 
 /** Removes a saved paper by its saved_papers row id, scoped to the owner. */
-export async function removeSavedPaper(userId: string, savedId: string): Promise<void> {
-  const { error } = await supabaseAdmin
+/** Returns the project the paper was removed from, so callers can invalidate caches. */
+export async function removeSavedPaper(userId: string, savedId: string): Promise<string | null> {
+  const { data, error } = await supabaseAdmin
     .from('saved_papers')
     .delete()
     .eq('id', savedId)
-    .eq('user_id', userId);
+    .eq('user_id', userId)
+    .select('project_id');
 
   if (error) throw new Error(`removeSavedPaper failed: ${error.message}`);
+  return (data as { project_id: string }[] | null)?.[0]?.project_id ?? null;
 }

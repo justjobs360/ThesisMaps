@@ -20,12 +20,22 @@ export const UNIFORM_RADIUS = 24;
 /**
  * Keep-out radius used by the force simulation.
  *
- * Bigger than the circle itself because each node carries a ~136px label
- * underneath; without the floor, small nodes pack close enough that their labels
- * overlap even though the circles don't.
+ * Bigger than the circle itself because each node carries a "Surname Year" pill
+ * underneath (~90px wide); without the floor, small nodes pack close enough that
+ * their labels overlap even though the circles don't. The floor was 88 when the
+ * label was a 136px two-line title block.
  */
 export function keepOutRadius(radius: number): number {
-  return Math.max(radius + 30, 88);
+  return Math.max(radius + 26, 68);
+}
+
+/**
+ * Area-proportional radius for one value, relative to the largest in view. The
+ * homepage preview calls this directly with its own radius bounds.
+ */
+export function sqrtRadius(value: number, max: number, minR = MIN_RADIUS, maxR = MAX_RADIUS): number {
+  const t = max > 0 ? Math.sqrt(Math.max(0, value)) / Math.sqrt(max) : 0;
+  return minR + t * (maxR - minR);
 }
 
 /** How many edges each node has within this graph. */
@@ -66,8 +76,7 @@ export function radiusMap(data: GraphData, mode: NodeSizeMode): Map<string, numb
     const value = values[i] ?? 0;
     // sqrt so AREA tracks the metric; guard max=0 (e.g. a library where nothing
     // has citations yet) so every node falls back to the same readable size.
-    const t = max > 0 ? Math.sqrt(value) / Math.sqrt(max) : 0;
-    radii.set(node.id, MIN_RADIUS + t * (MAX_RADIUS - MIN_RADIUS));
+    radii.set(node.id, sqrtRadius(value, max));
   }
 
   return radii;

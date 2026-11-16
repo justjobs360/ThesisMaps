@@ -13,12 +13,19 @@ export type GraphNode = {
 
 export type EdgeType = 'citation' | 'semantic_similarity' | 'co_author';
 
+/**
+ * `citation` edges are directed: `source` cites `target`. `semantic_similarity`
+ * and `co_author` are undirected and their source/target order carries no meaning.
+ */
 export type GraphEdge = {
   id: string;
   source: string;
   target: string;
   type: EdgeType;
+  /** Cosine similarity, 0..1, for semantic edges. */
   weight?: number;
+  /** Author names the two papers share, for co_author edges. */
+  names?: string[];
 };
 
 export type GraphData = {

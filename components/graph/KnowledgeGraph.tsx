@@ -1,8 +1,8 @@
 'use client';
 
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import ReactFlow, {
-  Background, MiniMap, useNodesState, useEdgesState, useReactFlow,
+  Background, MiniMap, useNodesState, useEdgesState, useReactFlow, useViewport,
   type Node, type Edge, type NodeMouseHandler,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
@@ -15,20 +15,28 @@ import { GraphControls } from './GraphControls';
 import { nodeColor } from './nodeColor';
 import { radiusMap } from './nodeSize';
 import { useForceLayout } from './useForceLayout';
+import { HoverCard } from './shared/HoverCard';
+import { byline, shortLabel } from './shared/labels';
+import { estimateLabelWidth, pickLabels } from './shared/labelLayout';
+import {
+  RELATION_KINDS, RELATION_LABEL, ROLE_HINT, ROLE_LABEL, computeFocus, getRelations,
+  type Related, type RelationKind,
+} from './shared/relations';
 import { Badge } from '@/components/ui/Badge';
-import type { GraphData, HeatmapMode, GraphNode, NodeSizeMode, GraphViewMode } from '@/types/graph';
-import type { Paper } from '@/types/paper';
+import type { GraphData, HeatmapMode, NodeSizeMode, GraphViewMode } from '@/types/graph';
 
 const nodeTypes = { paper: PaperNode };
 
 const EDGE_COLORS: Record<string, string> = {
-  citation: '#64748B',
+  citation: '#000000',
   semantic_similarity: '#0066FF',
-  co_author: '#94A3B8',
+  co_author: '#000000',
 };
 
-/** Below this many nodes, every label stays on; above it, only the larger ones. */
-const LABEL_ALL_BELOW = 14;
+const LABEL_FONT_PX = 11;
+const PANEL_W = 340;
+/** Grace period so the cursor can cross from a node into its card. */
+const HOVER_CLOSE_MS = 160;
 
 type SimilarPaper = { id: string; title: string; year: number | null; similarity: number };
 
@@ -42,6 +50,8 @@ type KnowledgeGraphProps = {
   projectId?: string;
 };
 
+const ALL_KINDS = new Set<RelationKind>(RELATION_KINDS);
+
 export function KnowledgeGraph({
   data,
   showMinimap,
@@ -53,7 +63,25 @@ export function KnowledgeGraph({
   const [sizeMode, setSizeMode] = useState<NodeSizeMode>('citations');
   const [viewMode, setViewMode] = useState<GraphViewMode>('cluster');
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [selectedPaper, setSelectedPaper] = useState<Paper | null>(null);
+  const [hoveredId, setHoveredId] = useState<string | null>(null);
+  /** Related papers under the pointer inside the hover card or panel. */
+  const [peek, setPeek] = useState<ReadonlySet<string> | null>(null);
+  /** Relation types the pinned selection is filtered to. */
+  const [kinds, setKinds] = useState<ReadonlySet<RelationKind>>(ALL_KINDS);
+
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const [bounds, setBounds] = useState({ w: 0, h: 0 });
+  const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const measure = () => setBounds({ w: el.clientWidth, h: el.clientHeight });
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
 
   const maxCitations = useMemo(
     () => data.nodes.reduce((m, n) => Math.max(m, n.paper.citationCount || 0), 0),
@@ -72,21 +100,54 @@ export function KnowledgeGraph({
 
   const positions = useForceLayout(data, radii, viewMode);
 
-  /** The selection plus its direct neighbours — everything else gets dimmed. */
-  const neighbours = useMemo(() => {
-    if (!selectedId) return null;
-    const set = new Set<string>([selectedId]);
-    for (const e of data.edges) {
-      if (e.source === selectedId) set.add(e.target);
-      if (e.target === selectedId) set.add(e.source);
-    }
-    return set;
-  }, [selectedId, data.edges]);
+  const labelOf = useMemo(() => {
+    const m = new Map(data.nodes.map((n) => [n.id, shortLabel(n.paper.authors, n.paper.year, n.paper.title)]));
+    return (id: string) => m.get(id) ?? '';
+  }, [data.nodes]);
+
+  const selectedNode = useMemo(() => data.nodes.find((n) => n.id === selectedId) ?? null, [data.nodes, selectedId]);
+  const selectedPaper = selectedNode?.paper ?? null;
+
+  /** Hover wins over the pinned selection while the pointer is on a paper. */
+  const focusId = hoveredId ?? selectedId;
+
+  const focus = useMemo(() => {
+    if (!focusId) return null;
+    // The relation chips filter the pinned selection only; hovering shows everything.
+    const filter = hoveredId || kinds.size === ALL_KINDS.size ? null : kinds;
+    return computeFocus(focusId, data.edges, filter, peek);
+  }, [focusId, hoveredId, kinds, peek, data.edges]);
 
   const [nodes, setNodes, onNodesChange] = useNodesState<PaperNodeData>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<GraphEdgeData>([]);
 
-  const labelEverything = data.nodes.length <= LABEL_ALL_BELOW;
+  const { zoomIn, zoomOut, fitView } = useReactFlow();
+  const viewport = useViewport();
+  // Bucketed so the label pass re-runs per zoom step, not per wheel tick.
+  const zoomBucket = Math.max(0.1, Math.round(viewport.zoom * 4) / 4);
+
+  /**
+   * Which papers earn a resting label. Zooming in frees space (the pill is a fixed
+   * screen size, so it covers fewer flow units), so more labels appear as you get
+   * closer; zoomed out, only the most-cited papers that clear each other keep one.
+   */
+  const labelled = useMemo(() => {
+    const items = data.nodes.map((n) => {
+      const p = positions.get(n.id) ?? { x: 0, y: 0 };
+      const text = labelOf(n.id);
+      return {
+        id: n.id,
+        x: p.x,
+        y: p.y,
+        r: radii.get(n.id) ?? 20,
+        priority: (n.paper.citationCount || 0) + (n.type === 'seed' ? 1e9 : 0),
+        w: estimateLabelWidth(text, LABEL_FONT_PX) / zoomBucket,
+        h: (LABEL_FONT_PX + 8) / zoomBucket,
+      };
+    });
+    const pinned = new Set(data.nodes.filter((n) => n.type === 'seed').map((n) => n.id));
+    return pickLabels(items, { pinned, max: data.nodes.length > 40 ? 30 : Infinity, gap: 4 / zoomBucket });
+  }, [data.nodes, positions, radii, labelOf, zoomBucket]);
 
   // LAYOUT — runs only when the simulation produces new coordinates (new data,
   // different sizing, or a view-mode switch). Kept separate from the appearance
@@ -108,7 +169,9 @@ export function KnowledgeGraph({
             radius,
             dimmed: false,
             highlighted: false,
-            showLabel: labelEverything || radius > 24,
+            focused: false,
+            label: labelOf(gn.id),
+            showLabel: labelled.has(gn.id),
           },
         };
       })
@@ -129,29 +192,31 @@ export function KnowledgeGraph({
           maxCitations,
           yearRange,
           radius: radii.get(n.id) ?? n.data.radius,
-          dimmed: neighbours ? !neighbours.has(n.id) : false,
-          highlighted: neighbours ? neighbours.has(n.id) : false,
-          showLabel: labelEverything || (radii.get(n.id) ?? 20) > 24,
+          dimmed: focus ? !focus.nodes.has(n.id) : false,
+          highlighted: focus ? focus.nodes.has(n.id) : false,
+          focused: focusId === n.id,
+          label: labelOf(n.id),
+          showLabel: labelled.has(n.id),
         },
       }))
     );
-  }, [heatmapMode, maxCitations, yearRange, neighbours, radii, labelEverything, setNodes]);
+  }, [heatmapMode, maxCitations, yearRange, focus, focusId, radii, labelled, labelOf, setNodes]);
 
   useEffect(() => {
     const next: Edge<GraphEdgeData>[] = data.edges.map((e) => {
-      const touchesSelection = selectedId ? e.source === selectedId || e.target === selectedId : false;
+      const state = focus?.edges.get(e.id);
+      const visual = !focus ? 'idle' : state === 'peek' ? 'peek' : state === 'on' ? 'on' : 'dim';
       return {
         id: e.id,
         source: e.source,
         target: e.target,
         type: e.type,
-        data: { dimmed: selectedId ? !touchesSelection : false, highlighted: touchesSelection },
+        zIndex: visual === 'on' || visual === 'peek' ? 10 : 0,
+        data: { visual, weight: e.weight },
       };
     });
     setEdges(next);
-  }, [data.edges, selectedId, setEdges]);
-
-  const { zoomIn, zoomOut, fitView } = useReactFlow();
+  }, [data.edges, focus, setEdges]);
 
   // Fit AFTER the nodes have been measured. ReactFlow's `fitView` prop runs at
   // mount, when nodes are still at their default position and have no measured
@@ -162,6 +227,33 @@ export function KnowledgeGraph({
     const t = setTimeout(() => void fitView({ padding: 0.25, duration: 300 }), 120);
     return () => clearTimeout(t);
   }, [positions, nodes.length, fitView]);
+
+  // --- hover with a grace period ---
+  const cancelClose = useCallback(() => {
+    if (closeTimer.current) clearTimeout(closeTimer.current);
+    closeTimer.current = null;
+  }, []);
+  const scheduleClose = useCallback(() => {
+    cancelClose();
+    closeTimer.current = setTimeout(() => {
+      setHoveredId(null);
+      setPeek(null);
+    }, HOVER_CLOSE_MS);
+  }, [cancelClose]);
+  const closeNow = useCallback(() => {
+    cancelClose();
+    setHoveredId(null);
+    setPeek(null);
+  }, [cancelClose]);
+  useEffect(() => cancelClose, [cancelClose]);
+
+  const onNodeMouseEnter: NodeMouseHandler = useCallback(
+    (_, node) => {
+      cancelClose();
+      setHoveredId(node.id);
+    },
+    [cancelClose]
+  );
 
   // --- "Find similar papers" ---
   const [similar, setSimilar] = useState<SimilarPaper[] | null>(null);
@@ -191,18 +283,47 @@ export function KnowledgeGraph({
     }
   }, [selectedPaper, projectId, similarLoading]);
 
-  const onNodeClick: NodeMouseHandler = useCallback((_, node) => {
-    const gn = node.data as GraphNode;
-    setSelectedId(gn.id);
-    setSelectedPaper(gn.paper);
-    setSimilar(null);
-    setSimilarNote(null);
-  }, []);
+  const select = useCallback(
+    (id: string) => {
+      closeNow();
+      setSelectedId(id);
+      setKinds(ALL_KINDS);
+      setSimilar(null);
+      setSimilarNote(null);
+    },
+    [closeNow]
+  );
+
+  const onNodeClick: NodeMouseHandler = useCallback((_, node) => select(node.id), [select]);
 
   const clearSelection = useCallback(() => {
+    closeNow();
     setSelectedId(null);
-    setSelectedPaper(null);
+    setKinds(ALL_KINDS);
+  }, [closeNow]);
+
+  const toggleKind = useCallback((k: RelationKind) => {
+    setKinds((prev) => {
+      const next = new Set(prev);
+      if (next.has(k)) next.delete(k);
+      else next.add(k);
+      return next;
+    });
   }, []);
+
+  // --- hover card ---
+  const hoverNode = hoveredId ? nodes.find((n) => n.id === hoveredId) : undefined;
+  const hoverData = hoverNode ? data.nodes.find((n) => n.id === hoverNode.id) : undefined;
+  const hoverRelations = useMemo(
+    () => (hoveredId ? getRelations(hoveredId, data.edges) : null),
+    [hoveredId, data.edges]
+  );
+  const cardBounds = { w: Math.max(0, bounds.w - (selectedPaper ? PANEL_W : 0)), h: bounds.h };
+
+  const selectedRelations = useMemo(
+    () => (selectedId ? getRelations(selectedId, data.edges) : null),
+    [selectedId, data.edges]
+  );
 
   const handleExport = useCallback(() => {
     if (nodes.length === 0) return;
@@ -216,14 +337,16 @@ export function KnowledgeGraph({
     const height = Math.max(...pts.map((p) => p.y + p.r + 40)) - minY + pad * 2;
     const pos = new Map(nodes.map((n) => [n.id, { x: n.position.x - minX + pad, y: n.position.y - minY + pad }]));
 
-    const edgeSvg = edges
+    const edgeSvg = data.edges
+      // Shared authorship is a focus-only overlay on screen; keep the export clean.
+      .filter((e) => e.type !== 'co_author')
       .map((e) => {
         const s = pos.get(e.source);
         const t = pos.get(e.target);
         if (!s || !t) return '';
-        const color = EDGE_COLORS[e.type ?? 'citation'] ?? '#64748B';
-        const dash = e.type === 'semantic_similarity' ? '6 3' : e.type === 'co_author' ? '2 2' : 'none';
-        return `<line x1="${s.x}" y1="${s.y}" x2="${t.x}" y2="${t.y}" stroke="${color}" stroke-width="1.5" stroke-dasharray="${dash}" opacity="0.4"/>`;
+        const color = EDGE_COLORS[e.type] ?? '#000000';
+        const dash = e.type === 'semantic_similarity' ? '6 4' : 'none';
+        return `<line x1="${s.x}" y1="${s.y}" x2="${t.x}" y2="${t.y}" stroke="${color}" stroke-width="1.5" stroke-dasharray="${dash}" opacity="0.45"/>`;
       })
       .join('');
 
@@ -233,9 +356,9 @@ export function KnowledgeGraph({
         if (!c) return '';
         const fill = nodeColor(n.data, heatmapMode, maxCitations, yearRange);
         const r = n.data.radius;
-        const title = (n.data.paper.title || '').slice(0, 30).replace(/[<&>]/g, '');
+        const label = n.data.label.replace(/[<&>]/g, '');
         // Offset shadow first, then the node, matching the on-screen treatment.
-        return `<g><circle cx="${c.x + 5}" cy="${c.y + 5}" r="${r}" fill="#000000"/><circle cx="${c.x}" cy="${c.y}" r="${r}" fill="${fill}" stroke="#000000" stroke-width="3"/><text x="${c.x}" y="${c.y + r + 18}" text-anchor="middle" fill="#000000" font-family="sans-serif" font-size="10" font-weight="700">${title}</text><text x="${c.x}" y="${c.y + r + 31}" text-anchor="middle" fill="#666666" font-family="sans-serif" font-size="9">${n.data.paper.year || ''} - ${n.data.paper.citationCount} cit.</text></g>`;
+        return `<g><circle cx="${c.x + 5}" cy="${c.y + 5}" r="${r}" fill="#000000"/><circle cx="${c.x}" cy="${c.y}" r="${r}" fill="${fill}" stroke="#000000" stroke-width="3"/><text x="${c.x}" y="${c.y + r + 18}" text-anchor="middle" fill="#000000" font-family="sans-serif" font-size="11" font-weight="700">${label}</text></g>`;
       })
       .join('');
 
@@ -247,16 +370,23 @@ export function KnowledgeGraph({
     a.download = 'thesismaps-graph.svg';
     a.click();
     URL.revokeObjectURL(url);
-  }, [nodes, edges, heatmapMode, maxCitations, yearRange]);
+  }, [nodes, data.edges, heatmapMode, maxCitations, yearRange]);
+
+  const rowsOf = (kind: RelationKind, rel: NonNullable<typeof selectedRelations>): Related[] =>
+    kind === 'buildsOn' ? rel.buildsOn : kind === 'builtOnBy' ? rel.builtOnBy : kind === 'similar' ? rel.similar : rel.coAuthors;
 
   return (
-    <div className="relative w-full h-full bg-graph-bg">
+    <div ref={containerRef} className="relative w-full h-full bg-graph-bg overflow-hidden">
       <ReactFlow
         nodes={nodes}
         edges={edges}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onNodeClick={onNodeClick}
+        onNodeMouseEnter={onNodeMouseEnter}
+        onNodeMouseLeave={scheduleClose}
+        onNodeDragStart={closeNow}
+        onMoveStart={closeNow}
         onPaneClick={clearSelection}
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
@@ -297,8 +427,37 @@ export function KnowledgeGraph({
         onExport={handleExport}
       />
 
-      {/* Legend — reflects what size and colour currently encode. */}
-      <div className="absolute bottom-4 left-4 z-10 bg-white border-2 border-black p-3 hidden sm:block max-w-[210px]">
+      {/* Hover card — an HTML overlay so the pointer can move into it. */}
+      {hoverNode && hoverData && hoverRelations && !(selectedPaper && hoveredId === selectedId) ? (
+        <HoverCard
+          anchor={{
+            x: hoverNode.position.x * viewport.zoom + viewport.x,
+            y: hoverNode.position.y * viewport.zoom + viewport.y,
+            r: (radii.get(hoverNode.id) ?? 20) * viewport.zoom + 6,
+          }}
+          bounds={cardBounds}
+          topInset={56}
+          paper={{
+            label: labelOf(hoverNode.id),
+            title: hoverData.paper.title,
+            byline: byline(hoverData.paper.authors),
+            year: hoverData.paper.year || null,
+            citations: hoverData.paper.citationCount || 0,
+            url: hoverData.paper.url,
+          }}
+          role={hoverRelations.role}
+          relations={hoverRelations}
+          labelOf={labelOf}
+          onEnter={cancelClose}
+          onLeave={scheduleClose}
+          onPeek={setPeek}
+          onPick={select}
+          footer={<p className="text-[10px] font-sans font-black uppercase tracking-widest text-black/45">Click the paper to pin this view</p>}
+        />
+      ) : null}
+
+      {/* Legend — reflects what size, colour and line style currently encode. */}
+      <div className="absolute bottom-4 left-4 z-10 bg-white border-2 border-black p-3 hidden sm:block max-w-[230px]">
         <p className="text-[9px] font-sans font-black uppercase tracking-[0.2em] text-black mb-2">Legend</p>
         <div className="flex items-end gap-1.5 mb-2">
           <span className="rounded-full border-2 border-black bg-accent" style={{ width: 10, height: 10 }} />
@@ -308,22 +467,34 @@ export function KnowledgeGraph({
             {sizeMode === 'connections' ? 'Connections' : sizeMode === 'uniform' ? 'Uniform' : 'Citations'}
           </span>
         </div>
+        <ul className="space-y-1 mb-2 text-[9px] font-sans font-bold uppercase tracking-wider text-black/60">
+          <li className="flex items-center gap-2">
+            <span className="inline-block w-6" style={{ borderTop: '2px solid #000' }} aria-hidden /> Cites (flows to citer)
+          </li>
+          <li className="flex items-center gap-2">
+            <span className="inline-block w-6" style={{ borderTop: '2px dashed #0066FF' }} aria-hidden /> Close in meaning
+          </li>
+          <li className="flex items-center gap-2">
+            <span className="inline-block w-6" style={{ borderTop: '2px dotted #000' }} aria-hidden /> Shared authors
+          </li>
+        </ul>
         <p className="text-[9px] font-sans font-bold uppercase tracking-wider text-black/50 leading-snug">
           {viewMode === 'timeline' ? 'Left to right = older to newer' : 'Closer together = more related'}
         </p>
-        <p className="text-[9px] font-sans text-black/40 mt-1 leading-snug">Click a paper to isolate its links.</p>
+        <p className="text-[9px] font-sans text-black/40 mt-1 leading-snug">Hover a paper to trace its links. Click to pin.</p>
       </div>
 
       {/* Node detail panel */}
       <AnimatePresence>
-        {selectedPaper ? (
+        {selectedPaper && selectedRelations ? (
           <motion.aside
             key="node-panel"
-            initial={{ x: 340, opacity: 0 }}
+            initial={{ x: PANEL_W, opacity: 0 }}
             animate={{ x: 0, opacity: 1 }}
-            exit={{ x: 340, opacity: 0 }}
+            exit={{ x: PANEL_W, opacity: 0 }}
             transition={{ duration: 0.25, ease: 'easeOut' }}
-            className="absolute top-0 right-0 h-full w-[340px] bg-white border-l-2 border-black overflow-y-auto z-20"
+            className="absolute top-0 right-0 h-full bg-white border-l-2 border-black overflow-y-auto z-20"
+            style={{ width: PANEL_W }}
             aria-label="Paper details"
           >
             <div className="p-5">
@@ -349,6 +520,86 @@ export function KnowledgeGraph({
               <p className="text-xs text-text-muted font-sans mb-3">
                 {selectedPaper.authors.slice(0, 4).map((a) => a.name).join(', ')}
               </p>
+
+              {/* Role in this map: derived from the citation links, so it says
+                  something about the library rather than the paper in general. */}
+              <div className="mb-4 border-2 border-black p-2.5">
+                <p className="text-[10px] font-sans font-black uppercase tracking-[0.18em] text-black">
+                  {ROLE_LABEL[selectedRelations.role]}
+                  <span className="text-black/40"> · in this map</span>
+                </p>
+                <p className="mt-1 text-[11px] font-sans text-black/60 leading-snug">{ROLE_HINT[selectedRelations.role]}</p>
+              </div>
+
+              {/* Relation filter: read lineage, meaning and authorship one at a time. */}
+              <div className="mb-3" role="group" aria-label="Show relationships">
+                <div className="flex flex-wrap gap-1.5">
+                  {RELATION_KINDS.map((k) => {
+                    const count = rowsOf(k, selectedRelations).length;
+                    const on = kinds.has(k);
+                    return (
+                      <button
+                        key={k}
+                        type="button"
+                        aria-pressed={on}
+                        disabled={count === 0}
+                        onClick={() => toggleKind(k)}
+                        className={[
+                          'h-7 px-2 border-2 border-black text-[9px] font-sans font-black uppercase tracking-widest transition-colors duration-150 disabled:opacity-30 disabled:cursor-not-allowed',
+                          on ? 'bg-black text-white' : 'bg-white text-black hover:bg-black/5',
+                        ].join(' ')}
+                      >
+                        {RELATION_LABEL[k]} {count}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="space-y-3 mb-4">
+                {RELATION_KINDS.filter((k) => kinds.has(k)).map((k) => {
+                  const rows = rowsOf(k, selectedRelations);
+                  if (rows.length === 0) return null;
+                  return (
+                    <section key={k} aria-label={RELATION_LABEL[k]}>
+                      <h3 className="text-[10px] font-sans font-black uppercase tracking-[0.18em] text-black/50 mb-1">
+                        {RELATION_LABEL[k]}
+                      </h3>
+                      <ul>
+                        {rows.map((r) => (
+                          <li key={r.edgeId}>
+                            <button
+                              type="button"
+                              onMouseEnter={() => setPeek(new Set([r.id]))}
+                              onMouseLeave={() => setPeek(null)}
+                              onFocus={() => setPeek(new Set([r.id]))}
+                              onBlur={() => setPeek(null)}
+                              onClick={() => select(r.id)}
+                              className="w-full flex items-baseline justify-between gap-3 px-1.5 -mx-1.5 py-0.5 text-left text-[12px] font-sans font-bold text-black hover:bg-black hover:text-white focus-visible:bg-black focus-visible:text-white outline-none transition-colors duration-150"
+                            >
+                              <span className="truncate">{labelOf(r.id)}</span>
+                              <span className="shrink-0 text-[10px] font-semibold opacity-60">
+                                {k === 'similar' && r.score != null
+                                  ? `${Math.round(r.score * 100)}%`
+                                  : k === 'coAuthor' && r.names?.length
+                                    ? r.names.length > 1
+                                      ? `${r.names[0]} +${r.names.length - 1}`
+                                      : r.names[0]
+                                    : ''}
+                              </span>
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    </section>
+                  );
+                })}
+                {RELATION_KINDS.every((k) => rowsOf(k, selectedRelations).length === 0) ? (
+                  <p className="text-[11px] font-sans text-black/50 leading-snug">
+                    No links to the other papers in this map yet. Save related work to connect it.
+                  </p>
+                ) : null}
+              </div>
 
               {selectedPaper.abstract ? (
                 <p className="text-xs text-black font-sans leading-relaxed line-clamp-6 mb-4">{selectedPaper.abstract}</p>

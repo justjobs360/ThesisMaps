@@ -4,7 +4,7 @@ import { requireUser } from '@/lib/admin-guard';
 import { ensureUser } from '@/lib/repository/users';
 import { getProject } from '@/lib/repository/projects';
 import { buildProjectGraph } from '@/lib/repository/graph';
-import { redis, cacheKey, CACHE_TTL } from '@/lib/redis';
+import { redis, graphCacheKey, CACHE_TTL } from '@/lib/redis';
 import { handleRouteError } from '@/lib/route-helpers';
 import type { GraphData } from '@/types/graph';
 
@@ -21,7 +21,7 @@ export async function GET(request: Request) {
     const project = await getProject(parsed.data, decoded.uid);
     if (!project) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
-    const ck = cacheKey('graph', decoded.uid, parsed.data);
+    const ck = graphCacheKey(decoded.uid, parsed.data);
     try {
       const cached = await redis.get<GraphData>(ck);
       if (cached) return NextResponse.json({ ...cached, cached: true });

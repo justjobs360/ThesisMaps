@@ -3,6 +3,7 @@ import { similarityPairs } from '@/lib/embeddings';
 import { getPaperReferences } from '@/lib/api/semanticScholar';
 import type { SavedPaper, Paper } from '@/types/paper';
 import type { GraphData, GraphNode, GraphEdge, NodeType } from '@/types/graph';
+import { coAuthorPairs } from '@/components/graph/shared/relations';
 
 const MAX_EXTERNAL_LOOKUPS = 12; // cap S2 calls per graph build (keyless rate limits)
 
@@ -46,12 +47,21 @@ export async function buildProjectGraph(userId: string, projectId: string): Prom
   const edges: GraphEdge[] = [];
   const edgeKeys = new Set<string>();
 
-  function addEdge(source: string, target: string, type: GraphEdge['type'], weight?: number) {
+  function addEdge(
+    source: string,
+    target: string,
+    type: GraphEdge['type'],
+    weight?: number,
+    names?: string[]
+  ) {
     if (source === target) return;
-    const key = [source, target, type].sort().join('|');
+    // Citations are directed, so A->B and B->A are different facts and must both
+    // survive; the undirected types collapse to one edge per pair.
+    const key =
+      type === 'citation' ? `${source}>${target}|citation` : [source, target].sort().join('|') + `|${type}`;
     if (edgeKeys.has(key)) return;
     edgeKeys.add(key);
-    edges.push({ id: `e${edges.length}`, source, target, type, weight });
+    edges.push({ id: `e${edges.length}`, source, target, type, weight, names });
   }
 
   // Citation edges via Semantic Scholar references (best-effort, capped).
@@ -98,10 +108,18 @@ export async function buildProjectGraph(userId: string, projectId: string): Prom
       for (let j = i + 1; j < nodes.length; j++) {
         const a = new Set(nodes[i]!.paper.fieldsOfStudy);
         const shared = nodes[j]!.paper.fieldsOfStudy.filter((f) => a.has(f)).length;
-        if (shared >= 2) addEdge(nodes[i]!.id, nodes[j]!.id, 'semantic_similarity', shared);
+        // Overlap as a 0..1 share of the smaller field list, so `weight` means the
+        // same kind of thing here as the cosine similarity it stands in for.
+        const smaller = Math.min(a.size, nodes[j]!.paper.fieldsOfStudy.length) || 1;
+        if (shared >= 2) addEdge(nodes[i]!.id, nodes[j]!.id, 'semantic_similarity', shared / smaller);
       }
     }
   }
+
+  // Shared authors (name-matched heuristic, see coAuthorPairs). Added last so it
+  // never counts as "structure" for the fallback above.
+  const pairs = coAuthorPairs(nodes.map((n) => ({ id: n.id, authors: n.paper.authors.map((a) => a.name) })));
+  for (const { a, b, names } of pairs) addEdge(a, b, 'co_author', undefined, names);
 
   return { nodes, edges };
 }

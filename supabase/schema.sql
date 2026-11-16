@@ -181,3 +181,23 @@ create index if not exists idx_feedback_status on feedback(status);
 
 -- Vector similarity index (IVFFlat for approximate nearest-neighbour search)
 create index if not exists idx_papers_embedding on papers using ivfflat (embedding vector_cosine_ops) with (lists = 100);
+
+-- Row level security: all app access goes through the service-role client
+-- (lib/supabase-server.ts), which bypasses RLS, so no policies are needed —
+-- enabling RLS just denies anon/authenticated access via PostgREST.
+-- Mirrors supabase/migrations/004_enable_rls.sql for fresh installs.
+alter table users enable row level security;
+alter table thesis_projects enable row level security;
+alter table papers enable row level security;
+alter table saved_papers enable row level security;
+alter table outline_sections enable row level security;
+alter table section_papers enable row level security;
+alter table seed_sets enable row level security;
+alter table collaborations enable row level security;
+alter table comments enable row level security;
+alter table saved_searches enable row level security;
+alter table feedback enable row level security;
+alter table flags enable row level security;
+alter table analytics_events enable row level security;
+alter table admin_activity_log enable row level security;
+alter table platform_settings enable row level security;

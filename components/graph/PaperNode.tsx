@@ -19,11 +19,15 @@ export type PaperNodeData = GraphNode & {
   maxCitations: number;
   yearRange: { min: number; max: number };
   radius: number;
-  /** Something is selected and this node is neither it nor a neighbour. */
+  /** Something is focused and this node is neither it nor in its visible relations. */
   dimmed: boolean;
-  /** This node is the selection, or directly connected to it. */
+  /** This node is the focus, or in the focus's visible relation set. */
   highlighted: boolean;
-  /** Labels are suppressed for small nodes once the canvas gets busy. */
+  /** This node is the focus itself (hovered, else selected). */
+  focused: boolean;
+  /** "Vaswani 2017" — the only text on the canvas; the full title lives in the card. */
+  label: string;
+  /** Whether the collision pass found room for a resting label. */
   showLabel: boolean;
 };
 
@@ -33,8 +37,9 @@ function PaperNodeImpl({ data, selected }: NodeProps<PaperNodeData>) {
   const fill = nodeColor(data, data.heatmapMode, data.maxCitations, data.yearRange);
   const r = data.radius;
   const size = r * 2;
-  const isFocus = selected || data.highlighted;
-  const border = isFocus ? 4 : 3;
+  const isFocus = selected || data.focused;
+  const border = isFocus || data.highlighted ? 4 : 3;
+  const labelled = data.showLabel || isFocus || data.highlighted;
 
   return (
     <div
@@ -73,8 +78,15 @@ function PaperNodeImpl({ data, selected }: NodeProps<PaperNodeData>) {
             backgroundColor: fill,
             border: `${border}px solid #000000`,
           }}
-          title={`${data.paper.title} (${data.paper.year || 'n.d.'}) — ${data.paper.citationCount.toLocaleString()} citations`}
         />
+        {/* Dashed seed ring, as on the homepage preview. */}
+        {data.type === 'seed' ? (
+          <span
+            className="absolute rounded-full pointer-events-none"
+            style={{ inset: -9, border: '1.5px dashed #0066FF', opacity: 0.6 }}
+            aria-hidden
+          />
+        ) : null}
         {data.isBookmarked ? (
           <span
             className="absolute w-3 h-3 border-2 border-black bg-white"
@@ -84,20 +96,15 @@ function PaperNodeImpl({ data, selected }: NodeProps<PaperNodeData>) {
         ) : null}
       </div>
 
-      {data.showLabel || isFocus ? (
-        <div className="mt-2 w-[136px] text-center pointer-events-none">
-          <p
-            className={[
-              'text-[10px] font-sans uppercase tracking-tight leading-tight line-clamp-2',
-              isFocus ? 'font-black text-black' : 'font-bold text-black/75',
-            ].join(' ')}
-          >
-            {data.paper.title}
-          </p>
-          <p className="text-[9px] font-sans font-bold text-black/40 mt-0.5 tracking-wider">
-            {data.paper.year || '—'} · {data.paper.citationCount.toLocaleString()}
-          </p>
-        </div>
+      {labelled ? (
+        <span
+          className={[
+            'mt-1 whitespace-nowrap px-1.5 py-px text-[11px] font-sans font-black leading-tight pointer-events-none select-none transition-colors duration-150',
+            isFocus ? 'bg-black text-white' : 'bg-white/85 text-black',
+          ].join(' ')}
+        >
+          {data.label}
+        </span>
       ) : null}
 
       <Handle

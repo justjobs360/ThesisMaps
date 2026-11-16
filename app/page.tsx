@@ -7,7 +7,7 @@ import {
 import { Button } from '@/components/ui/Button';
 import { WordCycler, TypingDots } from '@/components/ui/WordCycler';
 import { MarketingHeader } from '@/components/layout/MarketingHeader';
-import { ProductPreview, GraphLegend } from '@/components/marketing/ProductPreview';
+import { ProductPreview } from '@/components/marketing/ProductPreview';
 import { SmoothScroll } from '@/components/marketing/SmoothScroll';
 import { Reveal, Entrance, Parallax, STAGGER } from '@/components/marketing/Reveal';
 import { MarketingFooter } from '@/components/layout/MarketingFooter';
@@ -118,7 +118,9 @@ export default function LandingPage() {
           * Decoration must span the viewport; only text needs a measure. Now the
           * marks bleed off the true page edge, which reads as intentional.
           */}
-        <section className="relative overflow-hidden" aria-labelledby="hero-heading">
+        {/* overflow-x-clip, not overflow-hidden: hidden makes the section a scroll
+            container, which silently breaks the graph's position: sticky. */}
+        <section className="relative overflow-x-clip" aria-labelledby="hero-heading">
           {/**
             * Ambient layer: two large, near-invisible marks drifting on long
             * out-of-phase loops, so the hero is never completely still even
@@ -165,6 +167,10 @@ export default function LandingPage() {
 
           <div className="relative pt-24 md:pt-32 pb-10 md:pb-14 px-6 max-w-6xl mx-auto text-left">
 
+          {/* Centred on the first screen: the reading-list cards (GraphPreview)
+              float in a ring around this block, so it owns the middle. */}
+          <div className="flex flex-col items-center text-center lg:min-h-[calc(100svh-4rem-10rem)] lg:justify-center">
+
           {/* Hero arrival, top down. Each element sits one STAGGER step behind
               the one above it, so the block assembles as a single downward
               gesture rather than as six things fading in at once. The graph's own
@@ -186,10 +192,10 @@ export default function LandingPage() {
               />
             </h1>
           </Entrance>
-          <Entrance as="p" delay={STAGGER * 3} className="max-w-2xl font-sans text-text-muted text-lg md:text-xl leading-relaxed mb-8">
+          <Entrance as="p" delay={STAGGER * 3} className="max-w-2xl mx-auto font-sans text-text-muted text-lg md:text-xl leading-relaxed mb-8">
             Built exclusively for MSc students, PhD candidates and researchers. Transform the painful process of literature reviews into an interactive, visual journey.
           </Entrance>
-          <Entrance delay={STAGGER * 4} className="flex flex-col sm:flex-row items-start gap-6">
+          <Entrance delay={STAGGER * 4} className="flex flex-col sm:flex-row items-center justify-center gap-6">
             <Link href="/signup" className="w-full sm:w-auto">
               <Button size="lg" variant="primary" className={`w-full sm:w-auto px-10 h-14 text-base tracking-widest bg-black text-white hover:bg-accent border-none shadow-impact ${LIFT}`}>
                 Start for free
@@ -201,6 +207,7 @@ export default function LandingPage() {
               </Button>
             </Link>
           </Entrance>
+          </div>
 
           {/* Unframed, sitting directly on the page so it reads as embedded
               rather than a screenshot. aspect-[1080/550] matches the SVG viewBox
@@ -213,10 +220,9 @@ export default function LandingPage() {
               it on its own plane. 28px over a full transit — the reader should
               feel the depth, not watch it. */}
           <Entrance delay={STAGGER * 5} className="mt-8 md:mt-10">
-            <Parallax from={28} to={-28} className="relative w-full aspect-[1080/550]">
-              <ProductPreview kind="graph" animated interactive />
-            </Parallax>
-            <GraphLegend />
+            {/* No Parallax here: the graph runs its own pinned scroll story, and a
+                transform on its ancestor would fight the pinning. */}
+            <ProductPreview kind="graph" animated interactive story />
           </Entrance>
           </div>
         </section>

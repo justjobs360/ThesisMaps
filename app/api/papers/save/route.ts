@@ -5,6 +5,7 @@ import { ensureUser } from '@/lib/repository/users';
 import { getProject } from '@/lib/repository/projects';
 import { listSavedPapers, searchSavedPapers, savePaper, updateSavedPaper, removeSavedPaper } from '@/lib/repository/savedPapers';
 import { handleRouteError } from '@/lib/route-helpers';
+import { invalidateGraph } from '@/lib/redis';
 
 const paperSchema = z.object({
   id: z.string(),
@@ -69,6 +70,7 @@ export async function POST(request: Request) {
       notes: body.notes,
       isSeed: body.isSeed,
     });
+    await invalidateGraph(decoded.uid, body.projectId);
     return NextResponse.json({ saved }, { status: 201 });
   } catch (err) {
     return handleRouteError(err, 'papers/save/POST');
@@ -107,7 +109,8 @@ export async function DELETE(request: Request) {
     const decoded = await requireUser(request);
     await ensureUser(decoded);
     const body = deleteSchema.parse(await request.json());
-    await removeSavedPaper(decoded.uid, body.savedId);
+    const projectId = await removeSavedPaper(decoded.uid, body.savedId);
+    if (projectId) await invalidateGraph(decoded.uid, projectId);
     return NextResponse.json({ ok: true });
   } catch (err) {
     return handleRouteError(err, 'papers/save/DELETE');
