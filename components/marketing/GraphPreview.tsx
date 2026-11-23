@@ -58,7 +58,7 @@ const LABEL_PX = 12;
 
 const YEAR_MIN = 2014;
 const YEAR_MAX = 2026;
-const YEAR_RANGE = { min: YEAR_MIN, max: YEAR_MAX };
+export const YEAR_RANGE = { min: YEAR_MIN, max: YEAR_MAX };
 const X0 = 40;
 const X1 = 1040;
 const AXIS_Y = 462;
@@ -67,7 +67,7 @@ const Y_SHIFT = 38;
 /** Design-space x of a year's start. */
 const yearX = (year: number) => X0 + ((year - YEAR_MIN) / (YEAR_MAX - YEAR_MIN)) * (X1 - X0);
 
-type PreviewNode = {
+export type PreviewNode = {
   id: string;
   /** Offset into the paper's year, in design units — x stays inside its year. */
   jx: number;
@@ -82,7 +82,7 @@ type PreviewNode = {
 
 // Twelve real papers, so every line is a true statement. y values placed by hand
 // so no line passes through a circle.
-const NODES: PreviewNode[] = [
+export const NODES: PreviewNode[] = [
   { id: 'sutskever', jx: 14, y: 300, year: 2014, citations: 28000, title: 'Sequence to Sequence Learning with Neural Networks', authors: ['Ilya Sutskever', 'Oriol Vinyals', 'Quoc V. Le'] },
   { id: 'bahdanau', jx: 10, y: 170, year: 2015, citations: 24000, title: 'Neural Machine Translation by Jointly Learning to Align and Translate', authors: ['Dzmitry Bahdanau', 'Kyunghyun Cho', 'Yoshua Bengio'] },
   { id: 'vaswani', jx: 14, y: 265, year: 2017, citations: 112000, seed: true, title: 'Attention Is All You Need', authors: ['Ashish Vaswani', 'Noam Shazeer', 'Niki Parmar', 'Jakob Uszkoreit', 'Llion Jones', 'Aidan N. Gomez', 'Łukasz Kaiser', 'Illia Polosukhin'] },
@@ -118,7 +118,7 @@ const SIMILAR: [string, string, number][] = [
   ['touvron', 'deepseek', 0.7],
 ];
 
-const EDGES: RelEdge[] = [
+export const EDGES: RelEdge[] = [
   ...CITES.map(([source, target]) => ({ id: `c-${source}-${target}`, source, target, type: 'citation' as const })),
   ...SIMILAR.map(([source, target, weight]) => ({ id: `s-${source}-${target}`, source, target, type: 'semantic_similarity' as const, weight })),
   // Shared authorship is computed exactly as the app computes it.
@@ -196,7 +196,7 @@ const LINE_STOPS: [number, [number, number, number]][] = [
   [2022, [0x00, 0x66, 0xff]],
   [2026, [0x0a, 0x1f, 0x3d]],
 ];
-function lineColor(year: number): string {
+export function lineColor(year: number): string {
   const y = clamp(year, LINE_STOPS[0]![0], LINE_STOPS[LINE_STOPS.length - 1]![0]);
   let i = 0;
   while (i < LINE_STOPS.length - 2 && y > LINE_STOPS[i + 1]![0]) i++;
@@ -208,14 +208,14 @@ function lineColor(year: number): string {
 }
 
 /** Year order, so history assembles left to right. */
-const ORDER = new Map([...NODES].sort((a, b) => a.year - b.year || a.jx - b.jx).map((n, i) => [n.id, i]));
+export const ORDER = new Map([...NODES].sort((a, b) => a.year - b.year || a.jx - b.jx).map((n, i) => [n.id, i]));
 
 /**
  * The story told over the pinned scroll, one chapter at a time. Each chapter
  * lights one true thing on the map and says it in a sentence. Ranges are story
  * progress (0..1); the map itself finishes assembling by ~0.46.
  */
-type Chapter = {
+export type Chapter = {
   from: number;
   text: string;
   /** Light this paper's relations... */
@@ -225,7 +225,7 @@ type Chapter = {
   /** Or light a chain of papers, oldest first, joined by citations. */
   chain?: string[];
 };
-const CHAPTERS: Chapter[] = [
+export const CHAPTERS: Chapter[] = [
   { from: 0, text: 'Twelve papers on your desk, and no idea how they connect.' },
   { from: 0.12, text: 'ThesisMaps puts every paper in its place.' },
   { from: 0.4, text: 'Left to right is time. Every line runs from a paper to the work it builds on.' },
@@ -238,7 +238,7 @@ const CHAPTERS: Chapter[] = [
 const LIVE_AT = 0.88;
 
 /** Focus for a citation chain: its papers, and the citation edges between consecutive ones. */
-function chainFocus(chain: string[]): Focus {
+export function chainFocus(chain: string[]): Focus {
   const nodes = new Set(chain);
   const edges = new Map<string, 'on'>();
   for (let i = 1; i < chain.length; i++) {
@@ -257,12 +257,12 @@ const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
 
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
 
-const MAX_CITATIONS = Math.max(...NODES.map((n) => n.citations));
+export const MAX_CITATIONS = Math.max(...NODES.map((n) => n.citations));
 const radiusOf = (citations: number) => sqrtRadius(citations, MAX_CITATIONS, MIN_R, MAX_R);
 
-const BY_ID = new Map(NODES.map((n) => [n.id, n]));
+export const BY_ID = new Map(NODES.map((n) => [n.id, n]));
 const LABELS = new Map(NODES.map((n) => [n.id, shortLabel(n.authors, n.year, n.title)]));
-const labelOf = (id: string) => LABELS.get(id) ?? '';
+export const labelOf = (id: string) => LABELS.get(id) ?? '';
 
 /** History unfolds left to right: each paper enters at its year's moment. */
 const nodeDelay = (n: PreviewNode) => ENTRANCE_START + (n.year - YEAR_MIN) * 0.1;
@@ -536,8 +536,12 @@ function GraphPreview({
     (e: React.PointerEvent<SVGGElement>, id: string) => {
       if (!interactive) return;
       takeOver();
-      e.preventDefault();
-      e.currentTarget.setPointerCapture(e.pointerId);
+      // Touch: a tap pins, and the finger must stay free to scroll the map
+      // sideways, so no capture and no dragging.
+      if (e.pointerType !== 'touch') {
+        e.preventDefault();
+        e.currentTarget.setPointerCapture(e.pointerId);
+      }
       drag.current = { id, startY: e.clientY, origin: ys[id]!, moved: false };
     },
     [interactive, ys, takeOver]
@@ -548,7 +552,7 @@ function GraphPreview({
   const handlePointerMove = useCallback(
     (e: React.PointerEvent<SVGGElement>) => {
       const d = drag.current;
-      if (!d) return;
+      if (!d || e.pointerType === 'touch') return;
       if (!d.moved && Math.abs(e.clientY - d.startY) < 4) return;
       d.moved = true;
       const y = clamp(d.origin + (e.clientY - d.startY) / ky, MAX_R + 30 + Y_SHIFT, AXIS_Y + Y_SHIFT - MAX_R - 24);
@@ -657,9 +661,17 @@ function GraphPreview({
       onFocus={interactive ? takeOver : undefined}
       style={{ pointerEvents: live ? undefined : 'none' }}
     >
+      {/* Narrow screens: the timeline keeps a readable width (680px) and scrolls
+          sideways inside the column, instead of shrinking labels to nothing. */}
+      <div className={storyOn ? 'flex-1 min-h-0 flex flex-col' : 'overflow-x-auto -mx-6 px-6 md:mx-0 md:px-0 pb-1'}>
+      {!storyOn ? (
+        <p className="md:hidden mb-2 text-[10px] font-sans font-black uppercase tracking-[0.2em] text-black/40">
+          Tap a paper to read its story · Swipe for later years →
+        </p>
+      ) : null}
       <div
         ref={frameRef}
-        className={storyOn ? 'relative w-full flex-1 min-h-0' : 'relative w-full'}
+        className={storyOn ? 'relative w-full flex-1 min-h-0' : 'relative w-full min-w-[680px] md:min-w-0'}
         style={storyOn ? undefined : { aspectRatio: `${VIEW_W} / ${VIEW_H}` }}
       >
         <svg
@@ -775,7 +787,7 @@ function GraphPreview({
                 style={{
                   opacity: (focus && !inFocus ? 0.2 : 1) * nodeT,
                   transition: `opacity 400ms ${EASE}`,
-                  ...(interactive ? { touchAction: 'none' as const } : {}),
+                  ...(interactive ? { touchAction: 'pan-x pan-y' as const } : {}),
                 }}
                 onPointerDown={interactive ? (e) => handlePointerDown(e, n.id) : undefined}
                 onPointerMove={interactive ? handlePointerMove : undefined}
@@ -873,10 +885,12 @@ function GraphPreview({
         </svg>
 
         {interactive ? (
-          <p style={{ opacity: live ? 1 : 0, transition: 'opacity 300ms' }} className="absolute top-0 left-0 text-[10px] font-sans font-black uppercase tracking-[0.2em] text-black/45 pointer-events-none select-none">
+          <p style={{ opacity: live ? 1 : 0, transition: 'opacity 300ms' }} className="hidden md:block absolute top-0 left-0 text-[10px] font-sans font-black uppercase tracking-[0.2em] text-black/45 pointer-events-none select-none">
             Hover a paper to trace it · Click to pin
           </p>
         ) : null}
+      </div>
+
       </div>
 
       {/* Narration. One sentence at a time, under the map, below one of the

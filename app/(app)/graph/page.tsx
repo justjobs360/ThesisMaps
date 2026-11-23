@@ -23,7 +23,7 @@ export default function GraphPage() {
         <PageHeader title="Knowledge Graph" subtitle="Explore citation networks and semantic connections across your library." />
       </div>
 
-      <div className="flex-1">
+      <div className="flex-1" data-tour="graph-canvas">
         {loading ? (
           <div className="flex items-center justify-center h-full bg-graph-bg">
             <p className="text-black/50 font-sans font-black uppercase tracking-[0.2em] text-[10px] animate-pulse">

@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/Button';
 import { WordCycler, TypingDots } from '@/components/ui/WordCycler';
 import { MarketingHeader } from '@/components/layout/MarketingHeader';
 import { ProductPreview } from '@/components/marketing/ProductPreview';
+import { MobileShowcase } from '@/components/marketing/MobileShowcase';
 import { SmoothScroll } from '@/components/marketing/SmoothScroll';
 import { Reveal, Entrance, Parallax, STAGGER } from '@/components/marketing/Reveal';
 import { MarketingFooter } from '@/components/layout/MarketingFooter';
@@ -181,15 +182,23 @@ export default function LandingPage() {
           </Entrance>
           <Entrance delay={STAGGER * 2}>
             <h1 id="hero-heading" className="font-serif text-[clamp(2.5rem,8vw,5.5rem)] text-text-primary mb-6 leading-[1.1] tracking-tight">
-              The visual way to <TypingDots className="text-accent" /> <br className="hidden md:block" />
+              The visual way to <TypingDots className="text-accent" />
               {/* Same family, size and weight as the roman line above; only the
                   colour differs. It previously differed on four axes at once
                   (italic, light, 0.95em, muted grey), which is what read as
-                  several competing fonts in one headline. */}
-              <WordCycler
-                words={['map your literature', 'find the gaps', 'write with confidence']}
-                className="text-accent"
-              />
+                  several competing fonts in one headline.
+
+                  Its own single line with a fixed height: the phrase types and
+                  deletes itself, so its height must not depend on it. It never
+                  wraps — on narrow phones the size steps down (8.4vw) just enough
+                  for the longest phrase to fit — so the gap below is identical
+                  for every phrase and nothing on the page moves. */}
+              <span className="block whitespace-nowrap h-[1.1em] text-[min(1em,8.4vw)]">
+                <WordCycler
+                  words={['map your literature', 'find the gaps', 'write with confidence']}
+                  className="text-accent"
+                />
+              </span>
             </h1>
           </Entrance>
           <Entrance as="p" delay={STAGGER * 3} className="max-w-2xl mx-auto font-sans text-text-muted text-lg md:text-xl leading-relaxed mb-8">
@@ -222,7 +231,14 @@ export default function LandingPage() {
           <Entrance delay={STAGGER * 5} className="mt-8 md:mt-10">
             {/* No Parallax here: the graph runs its own pinned scroll story, and a
                 transform on its ancestor would fight the pinning. */}
-            <ProductPreview kind="graph" animated interactive story />
+            {/* Phones get the Find / Map / Defend showcase (self-playing CSS scenes); the interactive,
+                scroll-driven version is for screens with a pointer and room. */}
+            <div className="md:hidden">
+              <MobileShowcase />
+            </div>
+            <div className="hidden md:block">
+              <ProductPreview kind="graph" animated interactive story />
+            </div>
           </Entrance>
           </div>
         </section>

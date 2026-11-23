@@ -29,6 +29,7 @@ export function SearchBar({ value, onChange, onSubmit, placeholder = 'Search pap
         />
         <input
           id="paper-search"
+          data-tour="paper-search"
           // Deliberately `text`, not `search`: type="search" makes the browser
           // render its own ::-webkit-search-cancel-button, which appeared as a
           // second X beside the custom clear button below.

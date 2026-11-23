@@ -234,6 +234,66 @@
   animation: tm-card-in 0.7s cubic-bezier(0.16, 1, 0.3, 1) var(--tm-delay, 0s) both;
 }
 
+/**
+ * Mobile showcase scenes (components/marketing/MobileShowcase.tsx). One 9s loop
+ * per scene; each `ms-at-N` element appears at roughly N% of the loop, holds,
+ * and clears just before it restarts, so a scene builds up and resets. Only
+ * transform, opacity and (for the typing) clip-path move. Everything is paused
+ * until its card is on screen (`ms-run`).
+ */
+@keyframes ms-at-20 { 0%, 16% { opacity: 0; transform: translateY(6px); } 22%, 90% { opacity: 1; transform: none; } 96%, 100% { opacity: 0; transform: none; } }
+@keyframes ms-at-35 { 0%, 31% { opacity: 0; transform: translateY(6px); } 37%, 90% { opacity: 1; transform: none; } 96%, 100% { opacity: 0; transform: none; } }
+@keyframes ms-at-40 { 0%, 36% { opacity: 0; transform: translateY(6px); } 42%, 90% { opacity: 1; transform: none; } 96%, 100% { opacity: 0; transform: none; } }
+@keyframes ms-at-45 { 0%, 41% { opacity: 0; transform: translateY(6px); } 47%, 90% { opacity: 1; transform: none; } 96%, 100% { opacity: 0; transform: none; } }
+@keyframes ms-at-50 { 0%, 46% { opacity: 0; transform: translateY(6px); } 52%, 90% { opacity: 1; transform: none; } 96%, 100% { opacity: 0; transform: none; } }
+@keyframes ms-at-55 { 0%, 51% { opacity: 0; transform: translateY(6px); } 57%, 90% { opacity: 1; transform: none; } 96%, 100% { opacity: 0; transform: none; } }
+@keyframes ms-at-60 { 0%, 58% { opacity: 0; transform: scale(0.9); } 62%, 90% { opacity: 1; transform: none; } 96%, 100% { opacity: 0; transform: none; } }
+@keyframes ms-at-70 { 0%, 66% { opacity: 0; transform: translateY(6px); } 72%, 90% { opacity: 1; transform: none; } 96%, 100% { opacity: 0; transform: none; } }
+
+/* The query types in, holds, and clears with the scene. */
+@keyframes ms-type {
+  0%, 4% { clip-path: inset(0 100% 0 0); animation-timing-function: steps(16, end); }
+  24%, 92% { clip-path: inset(0 0 0 0); }
+  97%, 100% { clip-path: inset(0 100% 0 0); }
+}
+
+/* The cursor glides in to the Save button, presses, and leaves. */
+@keyframes ms-cursor {
+  0%, 40% { opacity: 0; transform: translate(70px, 120px); }
+  44% { opacity: 1; }
+  55% { transform: translate(0, 0); }
+  58% { transform: translate(0, 0) scale(0.8); }
+  61%, 84% { opacity: 1; transform: translate(0, 0) scale(1); }
+  90%, 100% { opacity: 0; transform: translate(0, 0); }
+}
+
+@keyframes ms-ping {
+  0% { opacity: 0.9; transform: scale(0.55); }
+  100% { opacity: 0; transform: scale(1.7); }
+}
+
+@keyframes ms-blink {
+  0%, 49% { opacity: 1; }
+  50%, 100% { opacity: 0.15; }
+}
+
+.ms-anim { animation-duration: 9s; animation-iteration-count: infinite; animation-fill-mode: both; animation-play-state: paused; }
+.ms-at-20 { animation-name: ms-at-20; }
+.ms-at-35 { animation-name: ms-at-35; }
+.ms-at-40 { animation-name: ms-at-40; }
+.ms-at-45 { animation-name: ms-at-45; }
+.ms-at-50 { animation-name: ms-at-50; }
+.ms-at-55 { animation-name: ms-at-55; }
+.ms-at-60 { animation-name: ms-at-60; }
+.ms-at-70 { animation-name: ms-at-70; }
+.ms-type { animation-name: ms-type; animation-timing-function: linear; }
+.ms-cursor { animation-name: ms-cursor; animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1); }
+.ms-ping { animation: ms-ping 1.8s cubic-bezier(0.16, 1, 0.3, 1) infinite; animation-play-state: paused; }
+.ms-blink { animation: ms-blink 1s steps(1, end) infinite; animation-play-state: paused; }
+.ms-run .ms-anim,
+.ms-run .ms-ping,
+.ms-run .ms-blink { animation-play-state: running; }
+
 /** One-shot entrance: edges draw themselves in on first paint. */
 @keyframes tm-draw {
   from { stroke-dashoffset: var(--tm-draw-len, 600); }
@@ -311,6 +371,20 @@
     opacity: 1 !important;
     transform: none !important;
     transition: none !important;
+  }
+
+  /* Mobile showcase: every scene shown finished and still; no cursor or pulse. */
+  .ms-anim,
+  .ms-blink {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+    clip-path: none !important;
+  }
+
+  .ms-cursor,
+  .ms-ping {
+    display: none !important;
   }
 
   .tm-draw,

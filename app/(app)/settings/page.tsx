@@ -11,6 +11,7 @@ import { THESIS_STAGES, type ThesisStage } from '@/types/thesis';
 import { useAuth } from '@/context/AuthContext';
 import { useProject } from '@/hooks/useProject';
 import { apiClient } from '@/lib/apiClient';
+import { useTour } from '@/components/tour/Tour';
 
 type SaveState = { busy: boolean; message: string | null; isError: boolean };
 const idle: SaveState = { busy: false, message: null, isError: false };
@@ -19,6 +20,7 @@ export default function SettingsPage() {
   const { user, signOut } = useAuth();
   const { currentProject, projectId, refresh } = useProject();
   const router = useRouter();
+  const { start: startTour } = useTour();
 
   const [name, setName] = useState(user?.displayName ?? '');
   const [thesisTitle, setThesisTitle] = useState('');
@@ -123,6 +125,16 @@ export default function SettingsPage() {
   return (
     <div className="space-y-8 max-w-5xl mx-auto">
       <PageHeader title="Settings" subtitle="Manage your research profile and repository configurations." />
+
+      <section aria-labelledby="tour-heading" className="bg-white border-2 border-black p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h2 id="tour-heading" className="text-[10px] font-sans font-black uppercase tracking-[0.2em] text-accent">Product tour</h2>
+          <p className="mt-1 text-sm font-sans text-black/60">A two-minute walk through search, library, graph, outline, gaps and defence.</p>
+        </div>
+        <Button size="sm" variant="secondary" className="uppercase tracking-widest font-black h-11 shrink-0" onClick={startTour}>
+          Replay the tour
+        </Button>
+      </section>
 
       <div className="grid md:grid-cols-2 gap-8">
         <div className="space-y-8">

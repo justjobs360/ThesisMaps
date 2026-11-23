@@ -5,6 +5,8 @@ import React, { createContext, useContext, useState } from 'react';
 type SidebarContextType = {
   isOpen: boolean;
   toggle: () => void;
+  /** Used by the product tour to reveal the drawer on mobile when a step points into it. */
+  open: () => void;
   close: () => void;
 };
 
@@ -14,10 +16,11 @@ export function SidebarProvider({ children }: { children: React.ReactNode }) {
   const [isOpen, setIsOpen] = useState(false);
 
   const toggle = () => setIsOpen((prev) => !prev);
+  const open = () => setIsOpen(true);
   const close = () => setIsOpen(false);
 
   return (
-    <SidebarContext.Provider value={{ isOpen, toggle, close }}>
+    <SidebarContext.Provider value={{ isOpen, toggle, open, close }}>
       {children}
     </SidebarContext.Provider>
   );

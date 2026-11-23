@@ -5,6 +5,7 @@ import { Sidebar } from '@/components/layout/Sidebar';
 import { Topbar } from '@/components/layout/Topbar';
 import { AppFooter } from '@/components/layout/AppFooter';
 import { AuthGuard } from '@/components/auth/AuthGuard';
+import { TourProvider } from '@/components/tour/Tour';
 
 // Applies to every /(app) route — keep the authenticated workspace out of search indexes.
 export const metadata: Metadata = {
@@ -16,6 +17,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     <AuthGuard>
       <ProjectProvider>
       <SidebarProvider>
+      <TourProvider>
         <div className="min-h-screen bg-white">
           <Sidebar />
           <Topbar />
@@ -28,6 +30,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             </div>
           </main>
         </div>
+      </TourProvider>
       </SidebarProvider>
       </ProjectProvider>
     </AuthGuard>

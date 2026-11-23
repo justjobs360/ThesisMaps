@@ -71,6 +71,7 @@ export function Sidebar() {
                 <li key={href}>
                   <Link
                     href={href}
+                    data-tour={`nav-${href.slice(1)}`}
                     onClick={() => { if (window.innerWidth < 1024) close(); }}
                     className={[
                       'flex items-center gap-3 px-3 py-2.5 text-xs font-sans font-bold uppercase tracking-wider transition-all duration-200',

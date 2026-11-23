@@ -1,7 +1,8 @@
 'use client';
 
 import { usePathname, useRouter } from 'next/navigation';
-import { Search, Bell, ChevronRight, Menu } from 'lucide-react';
+import { Search, Bell, ChevronRight, Menu, HelpCircle } from 'lucide-react';
+import { useTour } from '@/components/tour/Tour';
 import { useAuth } from '@/hooks/useAuth';
 import { useSidebar } from '@/context/SidebarContext';
 import { Dropdown } from '@/components/ui/Dropdown';
@@ -25,6 +26,7 @@ export function Topbar() {
   const router = useRouter();
   const { user, signOut } = useAuth();
   const { toggle } = useSidebar();
+  const { start: startTour } = useTour();
 
   const pageLabel = ROUTE_LABELS[pathname] ?? 'ThesisMaps';
   const initials = (user?.displayName?.[0] ?? user?.email?.[0] ?? 'U').toUpperCase();
@@ -50,7 +52,9 @@ export function Topbar() {
 
         {/* Active project + switcher, then the current page. */}
         <div className="flex items-center gap-2 md:gap-3 flex-1 min-w-0">
-          <ProjectSwitcher />
+          <div data-tour="project-switcher" className="min-w-0">
+            <ProjectSwitcher />
+          </div>
           <nav
             aria-label="Breadcrumb"
             className="flex items-center gap-2 text-[10px] md:text-xs font-sans font-bold uppercase tracking-wider text-text-muted min-w-0"
@@ -70,6 +74,15 @@ export function Topbar() {
             <Search size={18} strokeWidth={2} />
           </button>
           <button
+            onClick={startTour}
+            data-tour="tour-replay"
+            aria-label="Take the product tour"
+            title="Take the product tour"
+            className="p-2 border border-transparent hover:border-black transition-colors"
+          >
+            <HelpCircle size={18} strokeWidth={2} />
+          </button>
+          <button
             aria-label="Notifications"
             className="p-2 border border-transparent hover:border-black transition-colors"
           >
@@ -87,6 +100,7 @@ export function Topbar() {
               </button>
             }
             items={[
+              { label: 'Take the tour', onClick: startTour },
               { label: 'Settings', onClick: () => { window.location.href = '/settings'; } },
               { label: 'Sign out', onClick: handleSignOut, danger: true },
             ]}
